@@ -128,4 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-.aup3
+*.aup3
