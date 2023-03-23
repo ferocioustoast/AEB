@@ -14,6 +14,7 @@ rdps = 150  # Right decibels per second: 150
 
 half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 extended = False  # If True keep lvol at lmaxvol after half_way, else lminvol
+buttons = False  # Press a few buttons on start
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
@@ -46,6 +47,7 @@ def load_defaults(types):
     elif types == 'o':
         half_way = defaults[8]
         extended = defaults[9]
+        buttons = defaults[10]
         verbose = defaults[11]
         very_verbose = defaults[12]
     elif types == 'b':
@@ -59,6 +61,7 @@ def load_defaults(types):
         rdps = defaults[7]
         half_way = defaults[8]
         extended = defaults[9]
+        buttons = defaults[10]
         verbose = defaults[11]
         very_verbose = defaults[12]
 
