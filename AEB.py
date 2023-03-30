@@ -115,8 +115,8 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
                 lvol = lmaxvol
             else:
                 lvol = lminvol
-            rvol = rmaxvol
-            rvol += rstep * (small_motor - half_way)
+            rvol = rminvol
+            rvol -= rstep * (small_motor - half_way)
         if small_motor > 0:
             if very_verbose:
                 print(f'real lvol: {lvol}, real rvol: {rvol}')
