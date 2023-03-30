@@ -1,7 +1,7 @@
 # Audio Estim Bridge
 Using python with vgamepad to emulate an X360 controller and turn received vibrations into sinewaves with pysinewave. This will only work on Windows as vgamepad only works on Windows.
 
-## WARNING: This program may unexpectedly shock you. The creator is not a professional software developer, audio engineer, or electrical engineer and has no idea what they are doing. You have been warned!
+## WARNING: This program may unexpectedly shock you. The creator is not a professional software developer, audio engineer, or electrical engineer and has no idea what they are doing. Use at your own risk. You have been warned!
 
 ### Installation
 
