@@ -27,6 +27,8 @@ rsteps = rminvol - rmaxvol
 lstep = lsteps / half_way
 rstep = rsteps / half_way
 
+last_motor = 0
+
 defaults = [
     lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps,
     half_way, extended, buttons, verbose, very_verbose
@@ -82,14 +84,19 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     Callback function triggered at each received state change
     :param small_motor: integer in [0, 255]
     """
+    global last_motor
     if small_motor > 0 or large_motor > 0:
         if very_verbose:
             print(f"large motor: {large_motor}, small motor: {small_motor}")
 
     # motor has rumble, start
     if large_motor > small_motor:
+        # Only care about the motor with most rumble
         small_motor = large_motor
-    if small_motor > 0:
+    if small_motor > 255:
+        # Shouldn't ever go above 255, just incase
+        small_motor = 255
+    if small_motor > 0 and small_motor != last_motor:
         if pause:
             small_motor = 0
 
@@ -117,26 +124,28 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
         # ensure left volume stays within lminmaxvol
         if lvol > lmaxvol:
             lvol = lmaxvol
-        if lvol < lminvol:
+        elif lvol < lminvol:
             lvol = lminvol
 
         # ensure right volume stays within rminmaxvol
         if rvol > rmaxvol:
             rvol = rmaxvol
-        if rvol < rminvol:
+        elif rvol < rminvol:
             rvol = rminvol
 
         # set the volume
         SineWave.set_volume(swr, rvol)
         SineWave.set_volume(swl, lvol)
         if small_motor > 0:
+            last_motor = small_motor
             if verbose:
                 print(f'lvol: {lvol}, rvol: {rvol}')
 
     # no rumble lower volume
     else:
-        SineWave.set_volume(swl, -50)
-        SineWave.set_volume(swr, -50)
+        if small_motor != last_motor:
+            SineWave.set_volume(swl, -50)
+            SineWave.set_volume(swr, -50)
 
 
 def print_help():
