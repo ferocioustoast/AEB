@@ -18,6 +18,7 @@ buttons = False  # Press a few buttons on start
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
+auto_pause = True  # Pause all sounds when entering the control menu
 
 
 lsteps = lminvol - lmaxvol
@@ -269,10 +270,11 @@ if __name__ == '__main__':
                 swl.play()
                 swr.play()
         elif n == 'c':
-            print('Auto Pausing...')
-            pause = True
-            swl.stop()
-            swr.stop()
+            if auto_pause:
+                print('Auto Pausing...')
+                pause = True
+                swl.stop()
+                swr.stop()
             while 1 == 1:
                 print_controls()
                 n = input("\n")
