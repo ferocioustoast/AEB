@@ -1,2 +1,3 @@
 vgamepad
 pysinewave
+sounddevice
