@@ -5,23 +5,13 @@ Using python with vgamepad to emulate an X360 controller and turn received vibra
 
 ### Installation
 
-_Installing is a little more complicated because pip does not download the up to date version of Pysinewave that allows the use of multiple sound channels_
-
 1. Download AEB.py and requirements.txt from this repo
 
 2. Install the requirements with Powershell/CMD
    ```sh
    python -m pip install -r .\requirements.txt
    ```
-   _vgamepad will launch an installer for ViGEm install that aswell._
-3. Download up to date Pysinewave sinewave.py file
-   ```sh
-   https://raw.githubusercontent.com/daviddavini/pysinewave/master/pysinewave/sinewave.py
-   ```
-4. Place sinewave.py into your python install location, default location is
-   ```sh
-   C:\Users\YOUR_USER\AppData\Local\Programs\Python\YOUR_VERSION\Lib\site-packages\pysinewave
-   ```
+3. During install vgamepad will launch an installer for ViGEm, install that aswell.
 
 ### Usage
 
