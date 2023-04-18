@@ -1,4 +1,5 @@
 from pysinewave import SineWave
+import sounddevice as sd
 import vgamepad as vg
 
 lfreq = 987  # Left channel frequency: 987
@@ -34,6 +35,9 @@ defaults = [
     lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps,
     half_way, extended, buttons, verbose, very_verbose
 ]
+
+# Get the default output sound device
+sound_out = sd.query_devices(device=sd.default.device[1])
 
 
 def load_defaults(types):
@@ -209,7 +213,7 @@ if __name__ == '__main__':
 
     gamepad.register_notification(callback_function=rumble)
 
-    print("Running...")
+    print(f"Connected to '{sound_out['name']}'")
 
     while 1 == 1:
         print_help()
