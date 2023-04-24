@@ -20,6 +20,7 @@ verbose = False  # spam volumes
 very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
 auto_pause = True  # Pause all sounds when entering the control menu
+use_volume = True  # If True chage volume, instead of frequency
 
 
 lsteps = lminvol - lmaxvol
