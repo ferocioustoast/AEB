@@ -84,73 +84,67 @@ def spam_buttons():
         time.sleep(0.5)
 
 
+def check_rumble(small_motor, large_motor):
+    # See if we need to do anything
+    if small_motor > 0:
+        # Motor has rumble
+        return True
+    else:
+        # Motor has no rumble
+        return False
+
+
+def find_l_vol(motor):
+    # calculate the needed left volume
+    lvol = lmaxvol
+    lvol += lstep * motor
+    if lvol > lmaxvol:
+        print(f'lvol was too high at: {lvol}')
+        lvol = lmaxvol
+    elif lvol < lminvol:
+        print(f'lvol was too low at: {lvol}')
+        lvol = lminvol
+    if verbose:
+        print(f'lvol: {lvol}')
+    return lvol
+
+
+def find_r_vol(motor):
+    # calculate the needed right volume
+    rvol = rminvol
+    rvol -= rstep * (motor - half_way)
+    if rvol > rmaxvol:
+        print(f'rvol was too high at: {rvol}')
+        rvol = rmaxvol
+    elif rvol < rminvol:
+        print(f'rvol was too low at: {rvol}')
+        rvol = rminvol
+    if verbose:
+        print(f'rvol: {rvol}')
+    return rvol
+
+
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
     """
     Callback function triggered at each received state change
     :param small_motor: integer in [0, 255]
     """
-    global last_motor
-    if small_motor > 0 or large_motor > 0:
-        if very_verbose:
-            print(f"large motor: {large_motor}, small motor: {small_motor}")
-
-    # motor has rumble, start
-    if large_motor > small_motor:
-        # Only care about the motor with most rumble
-        small_motor = large_motor
-    if small_motor > 255:
-        # Shouldn't ever go above 255, just incase
-        small_motor = 255
-    if small_motor > 0 and small_motor != last_motor:
-        if pause:
-            small_motor = 0
-
-        SineWave.set_frequency(swl, lfreq)
-        SineWave.set_frequency(swr, rfreq)
-        swl.sinewave_generator.decibels_per_second = ldps
-        swr.sinewave_generator.decibels_per_second = rdps
-
-        # calculate volume
-        if small_motor < half_way:
-            rvol = rminvol
-            lvol = lmaxvol
-            lvol += lstep * small_motor
-        else:
-            if extended:
-                lvol = lmaxvol
+    if check_rumble(small_motor, large_motor):
+        if use_volume:
+            if small_motor < half_way:
+                SineWave.set_volume(swl, find_l_vol(small_motor))
+                SineWave.set_volume(swr, rminvol)
             else:
-                lvol = lminvol
-            rvol = rminvol
-            rvol -= rstep * (small_motor - half_way)
-        if small_motor > 0:
-            if very_verbose:
-                print(f'real lvol: {lvol}, real rvol: {rvol}')
-
-        # ensure left volume stays within lminmaxvol
-        if lvol > lmaxvol:
-            lvol = lmaxvol
-        elif lvol < lminvol:
-            lvol = lminvol
-
-        # ensure right volume stays within rminmaxvol
-        if rvol > rmaxvol:
-            rvol = rmaxvol
-        elif rvol < rminvol:
-            rvol = rminvol
-
-        # set the volume
-        SineWave.set_volume(swr, rvol)
-        SineWave.set_volume(swl, lvol)
-        if small_motor > 0:
-            last_motor = small_motor
-            if verbose:
-                print(f'lvol: {lvol}, rvol: {rvol}')
-
-    # no rumble lower volume
+                if extended:
+                    SineWave.set_volume(swl, lmaxvol)
+                else:
+                    SineWave.set_volume(swl, lminvol)
+                SineWave.set_volume(swr, find_r_vol(small_motor))
+        else:
+            pass
     else:
-        if small_motor != last_motor:
-            SineWave.set_volume(swl, -50)
-            SineWave.set_volume(swr, -50)
+        SineWave.set_volume(swl, -50)
+        SineWave.set_volume(swr, -50)
 
 
 def print_help():
