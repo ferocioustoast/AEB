@@ -1,80 +1,34 @@
-from pysinewave import SineWave
-import sounddevice as sd
+import pygame._sdl2.audio as sdl2_audio
+from pygame import mixer
 import vgamepad as vg
+import numpy as np
+import os
 
-lfreq = 987  # Left channel frequency: 987
-rfreq = 987  # Right channel frequency: 987
-freq_add = 2  # Amount to change freq if not using volume: 2
+frequency = 987  # Frequency to play sinewave at: 987
 
-lmaxvol = -8  # Left maximum volume: -8
-lminvol = -10  # Left minimum volume: -10
-rmaxvol = -8  # Right maximum volume: -8
-rminvol = -10  # Right minimum volume: -10
+lmaxvol = 0.5  # Left maximum volume: 0.5
+lminvol = 0.4  # Left minimum volume: 0.4
+rmaxvol = 0.5  # Right maximum volume: 0.5
+rminvol = 0.4  # Right minimum volume: 0.4
 
-ldps = 150  # Left decibels per second: 150
-rdps = 150  # Right decibels per second: 150
-
-half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 extended = False  # If True keep lvol at lmaxvol after half_way, else lminvol
 buttons = False  # Press a few buttons on start
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
 auto_pause = True  # Pause all sounds when entering the control menu
-use_volume = True  # If True chage volume, instead of frequency
 
+half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 
-lsteps = lminvol - lmaxvol
-rsteps = rminvol - rmaxvol
+lstep = (lminvol - lmaxvol) / half_way
+rstep = (rminvol - rmaxvol) / half_way
 
-lstep = lsteps / half_way
-rstep = rsteps / half_way
+sample_rate = 44100  # Sample rate for sinewave: 44100
 
-lfstep = freq_add / half_way
-rfstep = freq_add / half_way
+sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
+                  * frequency / sample_rate).astype(np.float32)
 
-# Grab the settings used when file is opened
-defaults = [
-    lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps,
-    half_way, extended, buttons, verbose, very_verbose
-]
-
-# Get the default output sound device
-sound_out = sd.query_devices(device=sd.default.device[1])
-
-
-def load_defaults(types):
-    # load the settings that the program had when opened.
-    global lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps, half_way, extended, buttons, verbose, very_verbose
-    if types == 'c':
-        lfreq = defaults[0]
-        rfreq = defaults[1]
-        lmaxvol = defaults[2]
-        lminvol = defaults[3]
-        rmaxvol = defaults[4]
-        rminvol = defaults[5]
-        ldps = defaults[6]
-        rdps = defaults[7]
-    elif types == 'o':
-        half_way = defaults[8]
-        extended = defaults[9]
-        buttons = defaults[10]
-        verbose = defaults[11]
-        very_verbose = defaults[12]
-    elif types == 'b':
-        lfreq = defaults[0]
-        rfreq = defaults[1]
-        lmaxvol = defaults[2]
-        lminvol = defaults[3]
-        rmaxvol = defaults[4]
-        rminvol = defaults[5]
-        ldps = defaults[6]
-        rdps = defaults[7]
-        half_way = defaults[8]
-        extended = defaults[9]
-        buttons = defaults[10]
-        verbose = defaults[11]
-        very_verbose = defaults[12]
+did = ''
 
 
 def spam_buttons():
@@ -89,7 +43,7 @@ def spam_buttons():
         time.sleep(0.5)
 
 
-def check_rumble(small_motor, large_motor):
+def check_rumble(small_motor):
     # See if we need to do anything
     if small_motor > 0:
         # Motor has rumble
@@ -100,7 +54,8 @@ def check_rumble(small_motor, large_motor):
 
 
 def find_l_vol(motor):
-    # calculate the needed left volume
+    # Calculate the needed left volume
+    # Start at lmaxvol and lower to lminvol til halfway
     lvol = lmaxvol
     lvol += lstep * motor
     if lvol > lmaxvol:
@@ -114,17 +69,9 @@ def find_l_vol(motor):
     return lvol
 
 
-def find_l_freq(motor):
-    # calculate the needed left freq
-    lf = lfreq
-    lf += lfstep * motor
-    if verbose:
-        print(f'lfreq: {lf}')
-    return lf
-
-
 def find_r_vol(motor):
-    # calculate the needed right volume
+    # Calculate the needed right volume
+    # Start at rminvol and increase to rmaxvol
     rvol = rminvol
     rvol -= rstep * (motor - half_way)
     if rvol > rmaxvol:
@@ -138,13 +85,34 @@ def find_r_vol(motor):
     return rvol
 
 
-def find_r_freq(motor):
-    # calculate the needed right freq
-    rf = rfreq
-    rf += rfstep * motor
-    if verbose:
-        print(f'rfreq: {rf}')
-    return rf
+def select_device():
+    global did
+    print('\n')
+    devs = sdl2_audio.get_audio_device_names()
+    mixer.quit()
+    i = 0
+    while 1 == 1:
+        for d in devs:
+            print(f'{i} : {d}')
+            i += 1
+            if i >= len(devs):
+                i = 0
+        try:
+            n = int(input("Select desired output device: "))
+            print('\n')
+            print(f'Connecting to: {devs[n]}')
+            print('\n')
+            mixer.init(size=32, devicename=devs[n])
+            did = devs[n]
+            break
+        except IndexError:
+            print('\n')
+            print('Device not in list')
+            print('\n')
+        except ValueError:
+            print('\n')
+            print('Numbers only')
+            print('\n')
 
 
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
@@ -152,28 +120,19 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     Callback function triggered at each received state change
     :param small_motor: integer in [0, 255]
     """
-    if check_rumble(small_motor, large_motor):
-        if use_volume:
-            if small_motor < half_way:
-                SineWave.set_volume(swl, find_l_vol(small_motor))
-                SineWave.set_volume(swr, rminvol)
-            else:
-                if extended:
-                    SineWave.set_volume(swl, lmaxvol)
-                else:
-                    SineWave.set_volume(swl, lminvol)
-                SineWave.set_volume(swr, find_r_vol(small_motor))
+    sm = small_motor
+    if sm < large_motor:
+        sm = large_motor
+    if check_rumble(sm):
+        if sm < half_way:
+            mixer.Channel(0).set_volume(find_l_vol(sm), rminvol)
         else:
-            if small_motor < half_way:
-                SineWave.set_frequency(swl, find_l_freq(small_motor))
-                SineWave.set_frequency(swr, rfreq)
+            if extended:
+                mixer.Channel(0).set_volume(lmaxvol, find_r_vol(sm))
             else:
-                SineWave.set_frequency(swl, lfreq)
-                SineWave.set_frequency(swr, find_r_freq(small_motor))
+                mixer.Channel(0).set_volume(lminvol, find_r_vol(sm))
     else:
-        if use_volume:
-            SineWave.set_volume(swl, -50)
-            SineWave.set_volume(swr, -50)
+        mixer.Channel(0).set_volume(0.0, 0.0)
 
 
 def print_help():
@@ -197,18 +156,15 @@ def print_help():
         print('p : Toggle the sound [on] and off')
     print('c : Enter the control menu')
     print('h : Show this help menu')
-    print('r : Reset options')
     print('q : Quit')
 
 
 def print_controls():
     print('\n')
-    print(f'f  : Edit the left {[lfreq]} and/or right {[rfreq]} frequency')
+    # print(f'f  : Edit the {[frequency]} frequency')
     print(f'mi : Edit the left {[lminvol]} and/or right {[rminvol]} minimum volume')
     print(f'ma : Edit the left {[lmaxvol]} and/or right {[rmaxvol]} maximum volume')
-    print(f'd  : Edit the left {[ldps]} and/or right {[rdps]} decibels per second')
     print('c  : Leave the control menu')
-    print('r : Reset options')
     if pause:
         print('p  : Toggle the sound on and [off]')
     else:
@@ -216,29 +172,21 @@ def print_controls():
 
 
 if __name__ == '__main__':
-    # set left and right channels
-    swl = SineWave(pitch_per_second=ldps, decibels_per_second=ldps,
-                   channels=2, channel_side='l')
-    swr = SineWave(pitch_per_second=rdps, decibels_per_second=rdps,
-                   channels=2, channel_side='r')
+    # setup mixer
+    os.system('cls')
+    mixer.init(size=32)
+    mixer.set_num_channels(1)
+    sound = mixer.Sound(sinewave)
+    select_device()
 
-    # set volume -100, frequencies, start sound
-    SineWave.set_volume(swl, -100)
-    SineWave.set_volume(swr, -100)
-    if not use_volume:
-        SineWave.set_volume(swl, lmaxvol)
-        SineWave.set_volume(swr, rmaxvol)
-    SineWave.set_frequency(swl, lfreq)
-    SineWave.set_frequency(swr, rfreq)
-    swl.play()
-    swr.play()
+    # set volume to zero, play sound
+    mixer.Channel(0).set_volume(0.0, 0.0)
+    sound.play(-1)
 
     # start 360 controller, set rumble callback
     gamepad = vg.VX360Gamepad()
 
     gamepad.register_notification(callback_function=rumble)
-
-    print(f"Connected to '{sound_out['name']}'")
 
     while 1 == 1:
         print_help()
@@ -269,65 +217,33 @@ if __name__ == '__main__':
             else:
                 extended = True
                 print("extended: On")
-        elif n == 'r':
-            print('[o]ptions [c]ontrols or [b]oth?')
-            n = input("")
-            if n == 'o':
-                print(f'Resetting options...')
-                load_defaults('o')
-            elif n == 'c':
-                print(f'Resetting controls...')
-                load_defaults('c')
-            elif n == 'b':
-                print(f'Resetting options...')
-                load_defaults('b')
         elif n == 'p':
             if pause is False:
-                swl.sinewave_generator.decibels_per_second = 10000
-                swr.sinewave_generator.decibels_per_second = 10000
-                SineWave.set_volume(swl, -100)
-                SineWave.set_volume(swr, -100)
                 print('Pausing sound...')
                 pause = True
-                swl.stop()
-                swr.stop()
+                sound.stop()
             else:
-                swl.sinewave_generator.decibels_per_second = 100
-                swr.sinewave_generator.decibels_per_second = 100
                 print('Resuming sound...')
                 pause = False
-                swl.play()
-                swr.play()
+                sound.play(-1)
+        elif n == 'd':
+            select_device()
         elif n == 'c':
             if auto_pause:
                 print('Auto Pausing...')
                 pause = True
-                swl.stop()
-                swr.stop()
+                sound.stop()
             while 1 == 1:
                 print_controls()
                 n = input("\n")
                 if n == 'f':
-                    print('[l]eft [r]ight or [b]oth sides?')
-                    n = input("")
                     try:
-                        if n == 'l':
-                            print(f'Current left frequency: {lfreq}')
-                            n = input("Enter desired left frequency: ")
-                            print(f'Setting left frequency to {n}...')
-                            lfreq = float(n)
-                        elif n == 'r':
-                            print(f'Current right frequency: {rfreq}')
-                            n = input("Enter desired right frequency: ")
-                            print(f'Setting right frequency to {n}...')
-                            rfreq = float(n)
-                        elif n == 'b':
-                            print(f'Current left frequency: {lfreq}')
-                            print(f'Current right frequency: {rfreq}')
-                            n = input("Enter desired frequency: ")
-                            print(f'Setting both frequencies to {n}...')
-                            lfreq = float(n)
-                            rfreq = float(n)
+                        print(f'Current frequency: {frequency}')
+                        n = input("Enter desired frequency: ")
+                        print(f'Setting frequency to {n}...')
+                        frequency = float(n)
+                        mixer.quit()
+                        mixer.init(size=32, devicename=did)
                     except ValueError:
                         print('\n')
                         print('Numbers only')
@@ -390,60 +306,17 @@ if __name__ == '__main__':
                         print('Numbers only')
                 elif n == 'p':
                     if pause is False:
-                        swl.sinewave_generator.decibels_per_second = 10000
-                        swr.sinewave_generator.decibels_per_second = 10000
-                        SineWave.set_volume(swl, -100)
-                        SineWave.set_volume(swr, -100)
                         print('Pausing sound...')
                         pause = True
-                        swl.stop()
-                        swr.stop()
+                        sound.stop()
                     else:
-                        swl.sinewave_generator.decibels_per_second = 100
-                        swr.sinewave_generator.decibels_per_second = 100
                         print('Resuming sound...')
                         pause = False
-                        swl.play()
-                        swr.play()
-                elif n == 'd':
-                    print('[l]eft [r]ight or [b]oth sides?')
-                    n = input("")
-                    try:
-                        if n == 'l':
-                            print(f'Current left dps: {ldps}')
-                            n = input("Enter desired left dps: ")
-                            print(f'Setting left dps to {n}...')
-                            ldps = float(n)
-                        elif n == 'r':
-                            print(f'Current right dps: {rdps}')
-                            n = input("Enter desired right dps: ")
-                            print(f'Setting right dps to {n}...')
-                            rdps = float(n)
-                        elif n == 'b':
-                            print(f'Current left dps: {ldps}')
-                            print(f'Current right dps: {rdps}')
-                            n = input("Enter desired dps: ")
-                            print(f'Setting both dps to {n}...')
-                            ldps = float(n)
-                            rdps = float(n)
-                    except ValueError:
-                        print('\n')
-                        print('Numbers only')
-                elif n == 'r':
-                    print('[o]ptions [c]ontrols or [b]oth?')
-                    n = input("")
-                    if n == 'o':
-                        print(f'Resetting options...')
-                        load_defaults('o')
-                    elif n == 'c':
-                        print(f'Resetting controls...')
-                        load_defaults('c')
-                    elif n == 'b':
-                        print(f'Resetting options...')
-                        load_defaults('b')
+                        sound.play(-1)
                 elif n == 'c':
                     break
 
         elif n == 'q':
             print('Quitting...')
+            mixer.quit()
             break
