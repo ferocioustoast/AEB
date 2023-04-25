@@ -4,6 +4,7 @@ import vgamepad as vg
 
 lfreq = 987  # Left channel frequency: 987
 rfreq = 987  # Right channel frequency: 987
+freq_add = 2  # Amount to change freq if not using volume: 2
 
 lmaxvol = -8  # Left maximum volume: -8
 lminvol = -10  # Left minimum volume: -10
@@ -26,12 +27,13 @@ use_volume = True  # If True chage volume, instead of frequency
 lsteps = lminvol - lmaxvol
 rsteps = rminvol - rmaxvol
 
-
 lstep = lsteps / half_way
 rstep = rsteps / half_way
 
-last_motor = 0
+lfstep = freq_add / half_way
+rfstep = freq_add / half_way
 
+# Grab the settings used when file is opened
 defaults = [
     lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps,
     half_way, extended, buttons, verbose, very_verbose
@@ -42,6 +44,7 @@ sound_out = sd.query_devices(device=sd.default.device[1])
 
 
 def load_defaults(types):
+    # load the settings that the program had when opened.
     global lfreq, rfreq, lmaxvol, lminvol, rmaxvol, rminvol, ldps, rdps, half_way, extended, buttons, verbose, very_verbose
     if types == 'c':
         lfreq = defaults[0]
@@ -75,6 +78,7 @@ def load_defaults(types):
 
 
 def spam_buttons():
+    # Press the start button on the controller a few times
     import time
     for i in range(4):
         gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_START)
@@ -110,6 +114,15 @@ def find_l_vol(motor):
     return lvol
 
 
+def find_l_freq(motor):
+    # calculate the needed left freq
+    lf = lfreq
+    lf += lfstep * motor
+    if verbose:
+        print(f'lfreq: {lf}')
+    return lf
+
+
 def find_r_vol(motor):
     # calculate the needed right volume
     rvol = rminvol
@@ -123,6 +136,15 @@ def find_r_vol(motor):
     if verbose:
         print(f'rvol: {rvol}')
     return rvol
+
+
+def find_r_freq(motor):
+    # calculate the needed right freq
+    rf = rfreq
+    rf += rfstep * motor
+    if verbose:
+        print(f'rfreq: {rf}')
+    return rf
 
 
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
@@ -142,10 +164,16 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
                     SineWave.set_volume(swl, lminvol)
                 SineWave.set_volume(swr, find_r_vol(small_motor))
         else:
-            pass
+            if small_motor < half_way:
+                SineWave.set_frequency(swl, find_l_freq(small_motor))
+                SineWave.set_frequency(swr, rfreq)
+            else:
+                SineWave.set_frequency(swl, lfreq)
+                SineWave.set_frequency(swr, find_r_freq(small_motor))
     else:
-        SineWave.set_volume(swl, -50)
-        SineWave.set_volume(swr, -50)
+        if use_volume:
+            SineWave.set_volume(swl, -50)
+            SineWave.set_volume(swr, -50)
 
 
 def print_help():
@@ -189,15 +217,17 @@ def print_controls():
 
 if __name__ == '__main__':
     # set left and right channels
-    # decibels_per_second set really high to try and avoid init sound
-    swl = SineWave(pitch_per_second=100, decibels_per_second=10000,
+    swl = SineWave(pitch_per_second=ldps, decibels_per_second=ldps,
                    channels=2, channel_side='l')
-    swr = SineWave(pitch_per_second=100, decibels_per_second=10000,
+    swr = SineWave(pitch_per_second=rdps, decibels_per_second=rdps,
                    channels=2, channel_side='r')
 
     # set volume -100, frequencies, start sound
     SineWave.set_volume(swl, -100)
     SineWave.set_volume(swr, -100)
+    if not use_volume:
+        SineWave.set_volume(swl, lmaxvol)
+        SineWave.set_volume(swr, rmaxvol)
     SineWave.set_frequency(swl, lfreq)
     SineWave.set_frequency(swr, rfreq)
     swl.play()
