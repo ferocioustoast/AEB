@@ -15,15 +15,9 @@ Using python with vgamepad to emulate an X360 controller and turn received vibra
 
 ### Usage
 
-1. Change the active Windows playback sound device to the device your Estim device is connected to.
+1. Run AEB.py with Powershell/CMD or by double clicking AEB.py
 
-_The program will automatically attach to the active sound playback device on start. If you can hear the tone, it is likely that it is not being sent to your Estim device._
-
-2. Run AEB.py with Powershell/CMD or by double clicking AEB.py
-
-3. Change the active Windows playback sound device back.
-
-_The program only attaches when it is first launched; you can now change the active device back to hear any sounds that are not going to your Estim device. This also prevents any unintended sounds from going to your device, which can unexpectedly shock you._
+2. Select the output device you want the audio to play on.
 
 4. Use a program such as https://intiface.com/central/ that can connect to the X360 controller and control the vibrations.
 
