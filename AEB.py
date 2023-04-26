@@ -221,18 +221,18 @@ if __name__ == '__main__':
             if pause is False:
                 print('Pausing sound...')
                 pause = True
-                sound.stop()
+                mixer.pause()
             else:
                 print('Resuming sound...')
                 pause = False
-                sound.play(-1)
+                mixer.unpause()
         elif n == 'd':
             select_device()
         elif n == 'c':
             if auto_pause:
                 print('Auto Pausing...')
                 pause = True
-                sound.stop()
+                mixer.pause()
             while 1 == 1:
                 print_controls()
                 n = input("\n")
@@ -241,9 +241,6 @@ if __name__ == '__main__':
                         print(f'Current frequency: {frequency}')
                         n = input("Enter desired frequency: ")
                         print(f'Setting frequency to {n}...')
-                        frequency = float(n)
-                        mixer.quit()
-                        mixer.init(size=32, devicename=did)
                     except ValueError:
                         print('\n')
                         print('Numbers only')
@@ -308,11 +305,11 @@ if __name__ == '__main__':
                     if pause is False:
                         print('Pausing sound...')
                         pause = True
-                        sound.stop()
+                        mixer.pause()
                     else:
                         print('Resuming sound...')
                         pause = False
-                        sound.play(-1)
+                        mixer.unpause()
                 elif n == 'c':
                     break
 
