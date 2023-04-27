@@ -4,9 +4,9 @@ import vgamepad as vg
 import numpy as np
 import os
 
-frequency = 987  # Frequency to play sinewave at: 987
+frequency = 987  # Frequency, in hertz, to play sinewave at: 987
 
-# volume can be set between 0.0 and 1.0
+# Volume can be set between 0.0 and 1.0
 lmaxvol = 0.5  # Left maximum volume: 0.5
 lminvol = 0.4  # Left minimum volume: 0.4
 rmaxvol = 0.5  # Right maximum volume: 0.5
@@ -19,12 +19,10 @@ very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
 
+# Changing half_way can lead to math problems
 half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 
 sample_rate = 44100  # Sample rate for sinewave: 44100
-
-sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
-                  * frequency / sample_rate).astype(np.float32)
 
 did = ''
 
@@ -83,6 +81,12 @@ def find_r_vol(motor, rminvol, rmaxvol):
     if verbose:
         print(f'rvol: {rvol}')
     return rvol
+
+
+def generate_sinewave(frequency, sample_rate):
+    sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
+                      * float(frequency) / sample_rate).astype(np.float32)
+    return sinewave
 
 
 def select_device():
@@ -169,7 +173,7 @@ def print_controls():
     if warning:
         print('BE CAREFUL CHANGING THESE WHILE HOOKED UP!')
         print('\n')
-    # print(f'f  : Edit the {[frequency]} frequency')
+    print(f'f  : Edit the {[frequency]} frequency')
     print(f'mi : Edit the left {[lminvol]} and/or right {[rminvol]} minimum volume')
     print(f'ma : Edit the left {[lmaxvol]} and/or right {[rmaxvol]} maximum volume')
     print('c  : Leave the control menu')
@@ -189,7 +193,7 @@ if __name__ == '__main__':
 Do you have any active audio devices?')
         input()
     mixer.set_num_channels(1)
-    sound = mixer.Sound(sinewave)
+    sound = mixer.Sound(generate_sinewave(frequency, sample_rate))
     select_device()
 
     # set volume to zero, play sound
@@ -245,14 +249,19 @@ Do you have any active audio devices?')
             while 1 == 1:
                 print_controls()
                 n = input("\n")
-                # if n == 'f':
-                #     try:
-                #         print(f'Current frequency: {frequency}')
-                #         n = input("Enter desired frequency: ")
-                #         print(f'Setting frequency to {n}...')
-                #     except ValueError:
-                #         print('\n')
-                #         print('Numbers only')
+                if n == 'f':
+                    try:
+                        print(f'Current frequency: {frequency}')
+                        n = input("Enter desired frequency: ")
+                        print(f'Setting frequency to {n}...')
+                        mixer.stop()
+                        frequency = n
+                        sound = mixer.Sound(generate_sinewave(frequency, sample_rate))
+                        mixer.Channel(0).set_volume(0.0, 0.0)
+                        sound.play(-1)
+                    except ValueError:
+                        print('\n')
+                        print('Numbers only')
                 if n == 'mi':
                     print('[l]eft [r]ight or [b]oth sides?')
                     n = input("")
@@ -313,15 +322,6 @@ Do you have any active audio devices?')
                     except AssertionError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
-                # elif n == 'h':
-                #     print(f'Current Half way: {half_way}')
-                #     n = input("Enter desired half way: ")
-                #     print(f'Setting half way to {n}...')
-                #     try:
-                #         half_way = float(n)
-                #     except ValueError:
-                #         print('\n')
-                #         print('Numbers only')
                 elif n == 'p':
                     if pause is False:
                         print('Pausing sound...')
