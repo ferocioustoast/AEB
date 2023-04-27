@@ -6,6 +6,8 @@
 
 The program plays a sinewave and emulates an X360 controller that can connect to something like [Intiface](https://intiface.com/central/), which can control the rumble of the controller. Using the rumble, we change the volume of the left and right channels of the sinewave depending on the strength of the rumble.
 
+As vgamepad uses ViGEm, which is Windows only, <b>this will only work for Windows.</b>
+
 ### Installation
 
 _Assuming you already have [Python](https://www.python.org/downloads/) installed_,
