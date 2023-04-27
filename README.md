@@ -1,7 +1,10 @@
 # Audio Estim Bridge
-Using python with vgamepad to emulate an X360 controller and turn received vibrations into sinewaves with pygame mixer. This will only work on Windows as vgamepad only works on Windows.
 
 ## WARNING: This program may unexpectedly shock you. The creator is not a professional software developer, audio engineer, or electrical engineer and has no idea what they are doing. Use at your own risk. You have been warned!
+
+### How it Works
+
+The program plays a sinewave and emulates an X360 controller that can connect to something like https://intiface.com/central/, which can control the rumble of the controller. Using the rumble, we change the volume of the left and right channels of the sinewave depending on the strength of the rumble.
 
 ### Installation
 
