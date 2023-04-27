@@ -120,6 +120,8 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     Callback function triggered at each received state change
     :param small_motor: integer in [0, 255]
     """
+    if very_verbose:
+        print(f'small_motor: {small_motor}, large_motor: {large_motor}')
     sm = small_motor
     if sm < large_motor:
         sm = large_motor
