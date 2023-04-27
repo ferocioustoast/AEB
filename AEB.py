@@ -173,7 +173,6 @@ def print_controls():
         print('p  : Toggle the sound on and [off]')
     else:
         print('p  : Toggle the sound [on] and off')
-    print('q : Close the program')
 
 
 if __name__ == '__main__':
@@ -320,13 +319,8 @@ Do you have any active audio devices?')
                         print('Resuming sound...')
                         pause = False
                         mixer.unpause()
-                elif n == 'q':
-                    print('Quitting...')
-                    mixer.quit()
-                    break
                 elif n == 'c':
                     break
-
         elif n == 'q':
             print('Quitting...')
             mixer.quit()
