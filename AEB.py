@@ -17,7 +17,7 @@ buttons = False  # Press a few buttons on start
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states, volumes
 pause = False  # Pause all sounds
-auto_pause = True  # Pause all sounds when entering the control menu
+warning = True  # Display warning message on entering control menu
 
 half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 
@@ -164,6 +164,9 @@ def print_help():
 
 def print_controls():
     print('\n')
+    if warning:
+        print('BE CAREFUL CHANGING THESE WHILE HOOKED UP!')
+        print('\n')
     # print(f'f  : Edit the {[frequency]} frequency')
     print(f'mi : Edit the left {[lminvol]} and/or right {[rminvol]} minimum volume')
     print(f'ma : Edit the left {[lmaxvol]} and/or right {[rmaxvol]} maximum volume')
@@ -237,10 +240,6 @@ Do you have any active audio devices?')
         elif n == 'd':
             select_device()
         elif n == 'c':
-            if auto_pause:
-                print('Auto Pausing...')
-                pause = True
-                mixer.pause()
             while 1 == 1:
                 print_controls()
                 n = input("\n")
