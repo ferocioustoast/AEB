@@ -258,57 +258,69 @@ Do you have any active audio devices?')
                     try:
                         if n == 'l':
                             print(f'Current left minvol: {lminvol}')
-                            n = input("Enter desired left minvol: ")
+                            n = input("Enter desired left minvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting left minvol to {n}...')
                             lminvol = float(n)
                         elif n == 'r':
                             print(f'Current right minvol: {rminvol}')
-                            n = input("Enter desired right minvol: ")
+                            n = input("Enter desired right minvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting right minvol to {n}...')
                             rminvol = float(n)
                         elif n == 'b':
                             print(f'Current left minvol: {lminvol}')
                             print(f'Current right minvol: {rminvol}')
-                            n = input("Enter desired minvol: ")
+                            n = input("Enter desired minvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting both minvols to {n}...')
                             lminvol = float(n)
                             rminvol = float(n)
                     except ValueError:
                         print('\n')
-                        print('Numbers only')
+                        print('Numbers between 0.0 and 1.0 only')
+                    except AssertionError:
+                        print('\n')
+                        print('Numbers between 0.0 and 1.0 only')
                 if n == 'ma':
                     print('[l]eft [r]ight or [b]oth sides?')
                     n = input("")
                     try:
                         if n == 'l':
                             print(f'Current left maxvol: {lmaxvol}')
-                            n = input("Enter desired left maxvol: ")
+                            n = input("Enter desired left maxvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting left maxvol to {n}...')
                             lmaxvol = float(n)
                         elif n == 'r':
                             print(f'Current right maxvol: {rmaxvol}')
-                            n = input("Enter desired right maxvol: ")
+                            n = input("Enter desired right maxvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting right maxvol to {n}...')
                             rmaxvol = float(n)
                         elif n == 'b':
                             print(f'Current left maxvol: {lmaxvol}')
                             print(f'Current right maxvol: {rmaxvol}')
-                            n = input("Enter desired maxvol: ")
+                            n = input("Enter desired maxvol between 0.0 and 1.0: ")
+                            assert float(n) >= 0.0 and float(n) <= 1.0
                             print(f'Setting both maxvols to {n}...')
                             lmaxvol = float(n)
                             rmaxvol = float(n)
                     except ValueError:
                         print('\n')
-                        print('Numbers only')
-                elif n == 'h':
-                    print(f'Current Half way: {half_way}')
-                    n = input("Enter desired half way: ")
-                    print(f'Setting half way to {n}...')
-                    try:
-                        half_way = float(n)
-                    except ValueError:
+                        print('Numbers between 0.0 and 1.0 only')
+                    except AssertionError:
                         print('\n')
-                        print('Numbers only')
+                        print('Numbers between 0.0 and 1.0 only')
+                # elif n == 'h':
+                #     print(f'Current Half way: {half_way}')
+                #     n = input("Enter desired half way: ")
+                #     print(f'Setting half way to {n}...')
+                #     try:
+                #         half_way = float(n)
+                #     except ValueError:
+                #         print('\n')
+                #         print('Numbers only')
                 elif n == 'p':
                     if pause is False:
                         print('Pausing sound...')
