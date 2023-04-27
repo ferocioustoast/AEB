@@ -21,9 +21,6 @@ auto_pause = True  # Pause all sounds when entering the control menu
 
 half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 
-lstep = (lminvol - lmaxvol) / half_way
-rstep = (rminvol - rmaxvol) / half_way
-
 sample_rate = 44100  # Sample rate for sinewave: 44100
 
 sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
@@ -57,6 +54,7 @@ def check_rumble(small_motor):
 def find_l_vol(motor, lminvol, lmaxvol):
     # Calculate the needed left volume
     # Start at lmaxvol and lower to lminvol til halfway
+    lstep = (lminvol - lmaxvol) / half_way
     lvol = lmaxvol
     lvol += lstep * motor
     if lvol > lmaxvol:
@@ -73,6 +71,7 @@ def find_l_vol(motor, lminvol, lmaxvol):
 def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
+    rstep = (rminvol - rmaxvol) / half_way
     rvol = rminvol
     rvol -= rstep * (motor - half_way)
     if rvol > rmaxvol:
