@@ -6,6 +6,7 @@ import os
 
 frequency = 987  # Frequency to play sinewave at: 987
 
+# volume can be set between 0.0 and 1.0
 lmaxvol = 0.5  # Left maximum volume: 0.5
 lminvol = 0.4  # Left minimum volume: 0.4
 rmaxvol = 0.5  # Right maximum volume: 0.5
@@ -53,7 +54,7 @@ def check_rumble(small_motor):
         return False
 
 
-def find_l_vol(motor):
+def find_l_vol(motor, lminvol, lmaxvol):
     # Calculate the needed left volume
     # Start at lmaxvol and lower to lminvol til halfway
     lvol = lmaxvol
@@ -69,7 +70,7 @@ def find_l_vol(motor):
     return lvol
 
 
-def find_r_vol(motor):
+def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
     rvol = rminvol
@@ -125,12 +126,15 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
         sm = large_motor
     if check_rumble(sm):
         if sm < half_way:
-            mixer.Channel(0).set_volume(find_l_vol(sm), rminvol)
+            mixer.Channel(0).set_volume(find_l_vol(sm, lminvol, lmaxvol),
+                                        rminvol)
         else:
             if extended:
-                mixer.Channel(0).set_volume(lmaxvol, find_r_vol(sm))
+                mixer.Channel(0).set_volume(lmaxvol, find_r_vol(sm, rminvol,
+                                                                rmaxvol))
             else:
-                mixer.Channel(0).set_volume(lminvol, find_r_vol(sm))
+                mixer.Channel(0).set_volume(lminvol, find_r_vol(sm, rminvol,
+                                                                rmaxvol))
     else:
         mixer.Channel(0).set_volume(0.0, 0.0)
 
@@ -236,14 +240,14 @@ if __name__ == '__main__':
             while 1 == 1:
                 print_controls()
                 n = input("\n")
-                if n == 'f':
-                    try:
-                        print(f'Current frequency: {frequency}')
-                        n = input("Enter desired frequency: ")
-                        print(f'Setting frequency to {n}...')
-                    except ValueError:
-                        print('\n')
-                        print('Numbers only')
+                # if n == 'f':
+                #     try:
+                #         print(f'Current frequency: {frequency}')
+                #         n = input("Enter desired frequency: ")
+                #         print(f'Setting frequency to {n}...')
+                #     except ValueError:
+                #         print('\n')
+                #         print('Numbers only')
                 if n == 'mi':
                     print('[l]eft [r]ight or [b]oth sides?')
                     n = input("")
