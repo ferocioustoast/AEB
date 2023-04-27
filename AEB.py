@@ -160,7 +160,7 @@ def print_help():
         print('p : Toggle the sound [on] and off')
     print('c : Enter the control menu')
     print('h : Show this help menu')
-    print('q : Quit')
+    print('q : Close the program')
 
 
 def print_controls():
@@ -173,12 +173,18 @@ def print_controls():
         print('p  : Toggle the sound on and [off]')
     else:
         print('p  : Toggle the sound [on] and off')
+    print('q : Close the program')
 
 
 if __name__ == '__main__':
     # setup mixer
     os.system('cls')
-    mixer.init(size=32)
+    try:
+        mixer.init(size=32)
+    except Exception:
+        print('Could not initialize audio mixer. \
+Do you have any active audio devices?')
+        input()
     mixer.set_num_channels(1)
     sound = mixer.Sound(sinewave)
     select_device()
@@ -314,6 +320,10 @@ if __name__ == '__main__':
                         print('Resuming sound...')
                         pause = False
                         mixer.unpause()
+                elif n == 'q':
+                    print('Quitting...')
+                    mixer.quit()
+                    break
                 elif n == 'c':
                     break
 
