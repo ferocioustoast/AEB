@@ -40,27 +40,15 @@ def spam_buttons():
 
 
 def check_rumble(small_motor):
-    # See if we need to do anything
-    if small_motor > 0:
-        # Motor has rumble
-        return True
-    else:
-        # Motor has no rumble
-        return False
+    # Check if we need to do anything
+    return small_motor > 0
 
 
 def find_l_vol(motor, lminvol, lmaxvol):
     # Calculate the needed left volume
     # Start at lmaxvol and lower to lminvol til halfway
-    lstep = (lminvol - lmaxvol) / half_way
-    lvol = lmaxvol
-    lvol += lstep * motor
-    if lvol > lmaxvol:
-        print(f'lvol was too high at: {lvol}')
-        lvol = lmaxvol
-    elif lvol < lminvol:
-        print(f'lvol was too low at: {lvol}')
-        lvol = lminvol
+    lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_way
+    lvol = max(lminvol, min(lmaxvol, lvol))
     if verbose:
         print(f'lvol: {lvol}')
     return lvol
@@ -69,15 +57,8 @@ def find_l_vol(motor, lminvol, lmaxvol):
 def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
-    rstep = (rminvol - rmaxvol) / half_way
-    rvol = rminvol
-    rvol -= rstep * (motor - half_way)
-    if rvol > rmaxvol:
-        print(f'rvol was too high at: {rvol}')
-        rvol = rmaxvol
-    elif rvol < rminvol:
-        print(f'rvol was too low at: {rvol}')
-        rvol = rminvol
+    rvol = rminvol + (rmaxvol - rminvol) * (motor - half_way) / half_way
+    rvol = max(rminvol, min(rmaxvol, rvol))
     if verbose:
         print(f'rvol: {rvol}')
     return rvol
@@ -93,14 +74,10 @@ def select_device():
     global did
     print('\n')
     devs = sdl2_audio.get_audio_device_names()
-    mixer.quit()
     i = 0
     while 1 == 1:
-        for d in devs:
+        for i, d in enumerate(devs):
             print(f'{i} : {d}')
-            i += 1
-            if i >= len(devs):
-                i = 0
         try:
             n = int(input("Select desired output device: "))
             print('\n')
