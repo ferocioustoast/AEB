@@ -105,22 +105,23 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     """
     if very_verbose:
         print(f'small_motor: {small_motor}, large_motor: {large_motor}')
-    sm = small_motor
-    if sm < large_motor:
-        sm = large_motor
-    if check_rumble(sm):
-        if sm < half_way:
-            mixer.Channel(0).set_volume(find_l_vol(sm, lminvol, lmaxvol),
-                                        rminvol)
-        else:
-            if extended:
-                mixer.Channel(0).set_volume(lmaxvol, find_r_vol(sm, rminvol,
-                                                                rmaxvol))
-            else:
-                mixer.Channel(0).set_volume(lminvol, find_r_vol(sm, rminvol,
-                                                                rmaxvol))
+
+    motor = max(small_motor, large_motor)
+
+    if not check_rumble(motor):
+        mixer.Channel(0).set_volume(0)
+        return
+
+    lvol = find_l_vol(motor, lminvol, lmaxvol)
+    rvol = find_r_vol(motor, rminvol, rmaxvol)
+
+    if motor < half_way:
+        mixer.Channel(0).set_volume(lvol, rminvol)
     else:
-        mixer.Channel(0).set_volume(0.0, 0.0)
+        if extended:
+            mixer.Channel(0).set_volume(lmaxvol, rvol)
+        else:
+            mixer.Channel(0).set_volume(lminvol, rvol)
 
 
 def print_help():
@@ -176,7 +177,7 @@ Do you have any active audio devices?')
     select_device()
 
     # set volume to zero, play sound
-    mixer.Channel(0).set_volume(0.0, 0.0)
+    mixer.Channel(0).set_volume(0)
     sound.play(-1)
 
     # start 360 controller, set rumble callback
