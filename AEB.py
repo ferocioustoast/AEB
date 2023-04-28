@@ -177,7 +177,7 @@ Do you have any active audio devices?')
     select_device()
 
     # set volume to zero, play sound
-    mixer.Channel(0).set_volume(0)
+    mixer.Channel(0).set_volume(0.0, 0.0)
     sound.play(-1)
 
     # start 360 controller, set rumble callback
