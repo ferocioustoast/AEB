@@ -24,6 +24,7 @@ half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
 
 sample_rate = 44100  # Sample rate for sinewave: 44100
 
+# Empty string to store selected audio device in
 did = ''
 
 
@@ -74,6 +75,7 @@ def select_device():
     global did
     print('\n')
     devs = sdl2_audio.get_audio_device_names()
+    mixer.quit()
     i = 0
     while 1 == 1:
         for i, d in enumerate(devs):
