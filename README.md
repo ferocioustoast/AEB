@@ -30,18 +30,20 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 4. As the virtual controller receives rumble, the left and right channels volumes will change depending on the rumble. Play around with the hotkeys shown or edit the py file directly to customize the feeling.
 
-#### Hotkeys
+#### Main Menu Hotkeys
 
 ![screenshot](https://raw.githubusercontent.com/ferocioustoast/AEB/master/imgs/menu.PNG)
 
 - v  : Toggles showing left and right volume changes
 - vv : Toggles showing the motor states
 - x  : Presses the 'start' button four times on the virtual controller
-- e  : Sets the left channel volume to _lmaxvol_ when over _half_way_ rumble, instead of _lminvol_.
+- h  : Enables the old way of switching channels at _half_rum_
+   - e  : _Only shows if h was used._ Sets the left channel volume to _lmaxvol_ when over _half_rum_, instead of _lminvol_.
 - p  : Pauses the sound
 - c  : Enters the control menu _(see control menu hotkeys below)_.
-- h  : Shows the help menu
 - q  : Closes the program
+
+#### Control Menu Hotkeys
 
 ![screenshot](https://raw.githubusercontent.com/ferocioustoast/AEB/master/imgs/control_menu.PNG)
 

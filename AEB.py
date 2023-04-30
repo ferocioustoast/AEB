@@ -12,15 +12,16 @@ lminvol = 0.4  # Left minimum volume: 0.4
 rmaxvol = 0.5  # Right maximum volume: 0.5
 rminvol = 0.4  # Right minimum volume: 0.4
 
-extended = False  # If True keep lvol at lmaxvol after half_way, else lminvol
+half_way = False  # Old way, use half_rum to switch channels
+extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
 buttons = False  # Press a few buttons on start
 verbose = False  # spam volumes
-very_verbose = False  # Spam motor states, volumes
+very_verbose = False  # Spam motor states
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
 
-# Changing half_way can lead to math problems
-half_way = 127.5  # Used to switch channels, Calculate steps: 127.5
+# Changing half_rum can lead to math problems, only used in half_way
+half_rum = 127.5  # Used to switch channels, Calculate steps: 127.5
 
 sample_rate = 44100  # Sample rate for sinewave: 44100
 
@@ -47,8 +48,11 @@ def check_rumble(small_motor):
 
 def find_l_vol(motor, lminvol, lmaxvol):
     # Calculate the needed left volume
-    # Start at lmaxvol and lower to lminvol til halfway
-    lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_way
+    # Start at lmaxvol and lower to lminvol
+    if half_way:
+        lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_rum
+    else:
+        lvol = lmaxvol + (lminvol - lmaxvol) * motor / 255
     lvol = max(lminvol, min(lmaxvol, lvol))
     if verbose:
         print(f'lvol: {lvol}')
@@ -58,7 +62,10 @@ def find_l_vol(motor, lminvol, lmaxvol):
 def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
-    rvol = rminvol + (rmaxvol - rminvol) * (motor - half_way) / half_way
+    if half_way:
+        rvol = rminvol + (rmaxvol - rminvol) * (motor - half_rum) / half_rum
+    else:
+        rvol = rminvol + (rmaxvol - rminvol) * (motor) / 255
     rvol = max(rminvol, min(rmaxvol, rvol))
     if verbose:
         print(f'rvol: {rvol}')
@@ -109,13 +116,17 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     motor = max(small_motor, large_motor)
 
     if not check_rumble(motor):
-        mixer.Channel(0).set_volume(0)
+        mixer.Channel(0).set_volume(0.0, 0.0)
         return
 
     lvol = find_l_vol(motor, lminvol, lmaxvol)
     rvol = find_r_vol(motor, rminvol, rmaxvol)
 
-    if motor < half_way:
+    if not half_way:
+        mixer.Channel(0).set_volume(lvol, rvol)
+        return
+
+    if motor < half_rum:
         mixer.Channel(0).set_volume(lvol, rminvol)
     else:
         if extended:
@@ -135,16 +146,20 @@ def print_help():
     else:
         print('vv : Toggle very verbose mode on and [off]')
     print('x : Spam buttons')
-    if extended:
-        print('e : Toggle extended [on] and off')
+    if half_way:
+        print('h : Toggle half_way mode [on] and off')
     else:
-        print('e : Toggle extended on and [off]')
+        print('h : Toggle half_way mode on and [off]')
+    if half_way:
+        if extended:
+            print('e : Toggle extended [on] and off')
+        else:
+            print('e : Toggle extended on and [off]')
     if pause:
         print('p : Toggle the sound on and [off]')
     else:
         print('p : Toggle the sound [on] and off')
     print('c : Enter the control menu')
-    print('h : Show this help menu')
     print('q : Close the program')
 
 
@@ -206,7 +221,12 @@ Do you have any active audio devices?')
             print("Pressing buttons...")
             spam_buttons()
         elif n == 'h':
-            pass
+            if half_way is True:
+                half_way = False
+                print("half_way: Off")
+            else:
+                half_way = True
+                print("half_way: On")
         elif n == 'e':
             if extended is True:
                 extended = False
