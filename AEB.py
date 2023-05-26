@@ -12,11 +12,15 @@ lminvol = 0.4  # Left minimum volume: 0.4
 rmaxvol = 0.5  # Right maximum volume: 0.5
 rminvol = 0.4  # Right minimum volume: 0.4
 
+amp = 1
+
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
-buttons = False  # Press a few buttons on start
+
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states
+
+buttons = False  # Press start button four times
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
 
@@ -72,9 +76,10 @@ def find_r_vol(motor, rminvol, rmaxvol):
     return rvol
 
 
-def generate_sinewave(frequency, sample_rate):
+def generate_sinewave(frequency, sample_rate, amp):
     sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
                       * float(frequency) / sample_rate).astype(np.float32)
+    sinewave = sinewave * float(amp)
     return sinewave
 
 
@@ -168,6 +173,7 @@ def print_controls():
     if warning:
         print('BE CAREFUL CHANGING THESE WHILE HOOKED UP!')
         print('\n')
+    print(f'a  : Edit the {[amp]} amplification')
     print(f'f  : Edit the {[frequency]} frequency')
     print(f'mi : Edit the left {[lminvol]} and/or right {[rminvol]} minimum volume')
     print(f'ma : Edit the left {[lmaxvol]} and/or right {[rmaxvol]} maximum volume')
@@ -188,7 +194,7 @@ if __name__ == '__main__':
 Do you have any active audio devices?')
         input()
     mixer.set_num_channels(1)
-    sound = mixer.Sound(generate_sinewave(frequency, sample_rate))
+    sound = mixer.Sound(generate_sinewave(frequency, sample_rate, amp))
     select_device()
 
     # set volume to zero, play sound
@@ -256,13 +262,26 @@ Do you have any active audio devices?')
                         print(f'Setting frequency to {n}...')
                         mixer.stop()
                         frequency = n
-                        sound = mixer.Sound(generate_sinewave(frequency, sample_rate))
+                        sound = mixer.Sound(generate_sinewave(frequency, sample_rate, amp))
                         mixer.Channel(0).set_volume(0.0, 0.0)
                         sound.play(-1)
                     except ValueError:
                         print('\n')
                         print('Numbers only')
-                if n == 'mi':
+                elif n == 'a':
+                    try:
+                        print(f'Current amplitude: {amp}')
+                        n = input("Enter desired amplitude: ")
+                        print(f'Setting amplitude to {n}...')
+                        mixer.stop()
+                        amp = float(n)
+                        sound = mixer.Sound(generate_sinewave(frequency, sample_rate, amp))
+                        mixer.Channel(0).set_volume(0.0, 0.0)
+                        sound.play(-1)
+                    except ValueError:
+                        print('\n')
+                        print('Numbers only')
+                elif n == 'mi':
                     print('[l]eft [r]ight or [b]oth sides?')
                     n = input("")
                     try:
@@ -292,7 +311,7 @@ Do you have any active audio devices?')
                     except AssertionError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
-                if n == 'ma':
+                elif n == 'ma':
                     print('[l]eft [r]ight or [b]oth sides?')
                     n = input("")
                     try:
