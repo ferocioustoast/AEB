@@ -12,7 +12,7 @@ lminvol = 0.4  # Left minimum volume: 0.4
 rmaxvol = 0.5  # Right maximum volume: 0.5
 rminvol = 0.4  # Right minimum volume: 0.4
 
-amp = 1
+amp = 1  # Number used to multiply the sinewave by: 1
 
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
@@ -23,6 +23,12 @@ very_verbose = False  # Spam motor states
 buttons = False  # Press start button four times
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
+launch_programs = False  # auto launch below programs after selecting device
+
+programs = [  # list of programs to launch
+    # r'C:',  # opens C drive
+    # r'C:\Windows\notepad.exe',  # opens notepad exe directly
+]
 
 # Changing half_rum can lead to math problems, only used in half_way
 half_rum = 127.5  # Used to switch channels, Calculate steps: 127.5
@@ -31,6 +37,18 @@ sample_rate = 44100  # Sample rate for sinewave: 44100
 
 # Empty string to store selected audio device in
 did = ''
+
+
+def open_programs(programs):
+    if programs != []:
+        for program in programs:
+            try:
+                os.startfile(program)
+            except TypeError:
+                print(f"Couldn't open {program}")
+    else:
+        print('No programs were added to the programs list. \
+Please add them manually to the AEB.py file.')
 
 
 def spam_buttons():
@@ -164,6 +182,7 @@ def print_help():
         print('p : Toggle the sound on and [off]')
     else:
         print('p : Toggle the sound [on] and off')
+    print('l : Launch programs added to py file')
     print('c : Enter the control menu')
     print('q : Close the program')
 
@@ -196,6 +215,8 @@ Do you have any active audio devices?')
     mixer.set_num_channels(1)
     sound = mixer.Sound(generate_sinewave(frequency, sample_rate, amp))
     select_device()
+    if launch_programs:
+        open_programs(programs)
 
     # set volume to zero, play sound
     mixer.Channel(0).set_volume(0.0, 0.0)
@@ -249,8 +270,8 @@ Do you have any active audio devices?')
                 print('Resuming sound...')
                 pause = False
                 mixer.unpause()
-        elif n == 'd':
-            select_device()
+        elif n == 'l':
+            open_programs(programs)
         elif n == 'c':
             while 1 == 1:
                 print_controls()

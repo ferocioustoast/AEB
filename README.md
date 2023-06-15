@@ -40,6 +40,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - h  : Enables the old way of switching channels at _half_rum_
    - e  : _Only shows if h was used._ Sets the left channel volume to _lmaxvol_ when over _half_rum_, instead of _lminvol_.
 - p  : Pauses the sound
+- l  : Opens any programs manually added to the list in AEB.py.
 - c  : Enters the control menu _(see control menu hotkeys below)_.
 - q  : Closes the program
 
@@ -47,6 +48,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 ![screenshot](https://raw.githubusercontent.com/ferocioustoast/AEB/master/imgs/control_menu.PNG)
 
+- a  : Multiply the sinewave by the entered number.
 - f  : Edit the frequency _(in hertz)_ of the sinewave.
 - mi : Change the left/right or both channels minimum volumes; they must be in between 0.0 and 1.0.
 - ma : Change the left/right or both channels maximum volumes; they must be in between 0.0 and 1.0.
