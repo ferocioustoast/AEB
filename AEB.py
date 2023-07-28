@@ -2,6 +2,8 @@ import pygame._sdl2.audio as sdl2_audio
 from pygame import mixer
 import vgamepad as vg
 import numpy as np
+import threading
+import time
 import os
 
 frequency = 987  # Frequency, in hertz, to play sinewave at: 987
@@ -13,6 +15,11 @@ rmaxvol = 0.5  # Right maximum volume: 0.5
 rminvol = 0.4  # Right minimum volume: 0.4
 
 amp = 1  # Number used to multiply the sinewave by: 1
+
+ramp_up = True  # If at zero for inactive_time, ramp volume up over ramp_time
+ramp_time = 0.8  # Time, in seconds, to ramp volume up
+ramp_inc = 20  # Number of steps to take when ramping, more adds more time
+inactive_time = 0.6  # Time, in seconds, to be at zero to trigger ramp up
 
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
@@ -38,6 +45,9 @@ sample_rate = 44100  # Sample rate for sinewave: 44100
 # Empty string to store selected audio device in
 did = ''
 
+zero_time = 0
+last_zero = True
+
 
 def open_programs(programs):
     if programs != []:
@@ -47,7 +57,7 @@ def open_programs(programs):
             except TypeError:
                 print(f"Couldn't open {program}")
     else:
-        print('No programs were added to the programs list. \
+        print('No programs were added to the program list. \
 Please add them manually to the AEB.py file.')
 
 
@@ -128,6 +138,65 @@ def select_device():
             print('\n')
 
 
+def ramp_volume_up():
+    if verbose:
+        print('At zero ramping up...')
+    for i in range(round(ramp_inc) + 1):
+        if verbose:
+            print(f'{(i / ramp_inc)} / 1.0')
+        mixer.Sound.set_volume(sound, (i / ramp_inc))
+        time.sleep(ramp_time / ramp_inc)
+
+
+def control_motor(motor):
+    global zero_time
+    global last_zero
+    if not check_rumble(motor):
+        if ramp_up:
+            zero_time = time.time()
+            last_zero = True
+        mixer.Channel(0).set_volume(0.0, 0.0)
+        return
+
+    lvol = find_l_vol(motor, lminvol, lmaxvol)
+    rvol = find_r_vol(motor, rminvol, rmaxvol)
+
+    if ramp_up and last_zero and time.time() - zero_time >= inactive_time:
+        volume_ramp_up_thread = threading.Thread(target=ramp_volume_up)
+        mixer.Sound.set_volume(sound, 0.0)
+        volume_ramp_up_thread.start()
+
+    try:
+        while volume_ramp_up_thread.is_alive():
+            if not half_way:
+                mixer.Channel(0).set_volume(lvol, rvol)
+                last_zero = False
+                return
+
+            if motor < half_rum:
+                mixer.Channel(0).set_volume(lvol, rminvol)
+            else:
+                if extended:
+                    mixer.Channel(0).set_volume(lmaxvol, rvol)
+                else:
+                    mixer.Channel(0).set_volume(lminvol, rvol)
+            last_zero = False
+    except UnboundLocalError:
+        if not half_way:
+            mixer.Channel(0).set_volume(lvol, rvol)
+            last_zero = False
+            return
+
+        if motor < half_rum:
+            mixer.Channel(0).set_volume(lvol, rminvol)
+        else:
+            if extended:
+                mixer.Channel(0).set_volume(lmaxvol, rvol)
+            else:
+                mixer.Channel(0).set_volume(lminvol, rvol)
+        last_zero = False
+
+
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
     """
     Callback function triggered at each received state change
@@ -138,24 +207,7 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
 
     motor = max(small_motor, large_motor)
 
-    if not check_rumble(motor):
-        mixer.Channel(0).set_volume(0.0, 0.0)
-        return
-
-    lvol = find_l_vol(motor, lminvol, lmaxvol)
-    rvol = find_r_vol(motor, rminvol, rmaxvol)
-
-    if not half_way:
-        mixer.Channel(0).set_volume(lvol, rvol)
-        return
-
-    if motor < half_rum:
-        mixer.Channel(0).set_volume(lvol, rminvol)
-    else:
-        if extended:
-            mixer.Channel(0).set_volume(lmaxvol, rvol)
-        else:
-            mixer.Channel(0).set_volume(lminvol, rvol)
+    control_motor(motor)
 
 
 def print_help():
@@ -196,6 +248,10 @@ def print_controls():
     print(f'f  : Edit the {[frequency]} frequency')
     print(f'mi : Edit the left {[lminvol]} and/or right {[rminvol]} minimum volume')
     print(f'ma : Edit the left {[lmaxvol]} and/or right {[rmaxvol]} maximum volume')
+    if ramp_up:
+        print('r  : Edit ramp_up [on] settings')
+    else:
+        print('r  : Edit ramp_up [off] settings')
     print('c  : Leave the control menu')
     if pause:
         print('p  : Toggle the sound on and [off]')
@@ -371,6 +427,44 @@ Do you have any active audio devices?')
                         print('Resuming sound...')
                         pause = False
                         mixer.unpause()
+                elif n == 'r':
+                    if ramp_up:
+                        print(f'ramp up currently: on')
+                    else:
+                        print(f'ramp up currently: off')
+                    print(f'ramp up over {ramp_time} seconds, over {ramp_inc} steps, if at zero for {inactive_time} seconds')
+                    n = input("Toggle [r]amp_up, ramp_[t]ime, ram[p]_inc, [i]nactive_time: ")
+                    if n == 'r':
+                        if ramp_up:
+                            print(r'ramp up now off')
+                            ramp_up = False
+                        else:
+                            print(r'ramp up now on')
+                            ramp_up = True
+                    elif n == 't':
+                        n = input("Enter ramp time in seconds: ")
+                        try:
+                            print(f'Setting ramp time to: {float(n)} seconds')
+                            ramp_time = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
+                    elif n == 'i':
+                        n = input("Enter inactive time in seconds: ")
+                        try:
+                            print(f'Setting inactive time to: {float(n)} seconds')
+                            inactive_time = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
+                    elif n == 'p':
+                        n = input("Enter number of ramp steps: ")
+                        try:
+                            print(f'Setting steps to: {float(n)}')
+                            ramp_inc = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
                 elif n == 'c':
                     break
         elif n == 'q':
