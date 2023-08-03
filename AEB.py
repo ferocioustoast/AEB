@@ -166,25 +166,9 @@ def control_motor(motor):
         mixer.Sound.set_volume(sound, 0.0)
         volume_ramp_up_thread.start()
 
-    try:
-        while volume_ramp_up_thread.is_alive():
-            if not half_way:
-                mixer.Channel(0).set_volume(lvol, rvol)
-                last_zero = False
-                return
-
-            if motor < half_rum:
-                mixer.Channel(0).set_volume(lvol, rminvol)
-            else:
-                if extended:
-                    mixer.Channel(0).set_volume(lmaxvol, rvol)
-                else:
-                    mixer.Channel(0).set_volume(lminvol, rvol)
-            last_zero = False
-    except UnboundLocalError:
-        if not half_way:
-            mixer.Channel(0).set_volume(lvol, rvol)
-            last_zero = False
+    if not half_way:
+        mixer.Channel(0).set_volume(lvol, rvol)
+        last_zero = False
             return
 
         if motor < half_rum:
