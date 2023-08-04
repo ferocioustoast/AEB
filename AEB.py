@@ -249,6 +249,10 @@ def print_controls():
         print('r  : Edit ramp_up [on] settings')
     else:
         print('r  : Edit ramp_up [off] settings')
+    if ramp_down:
+        print('r  : Edit ramp_down [on] settings')
+    else:
+        print('r  : Edit ramp_down [off] settings')
     print('c  : Leave the control menu')
     if pause:
         print('p  : Toggle the sound on and [off]')
