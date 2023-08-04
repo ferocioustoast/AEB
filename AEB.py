@@ -462,6 +462,44 @@ Do you have any active audio devices?')
                         except ValueError:
                             print('\n')
                             print('Numbers only')
+                elif n == 'rd':
+                    if ramp_down:
+                        print(f'ramp down currently: on')
+                    else:
+                        print(f'ramp down currently: off')
+                    print(f'ramp down over {ramp_time_d} seconds, over {ramp_inc_d} steps, if inactive for {inactive_time_d} seconds')
+                    n = input("Toggle [r]amp_down, ramp_[t]ime_d, ram[p]_inc_d, [i]nactive_time_d: ")
+                    if n == 'r':
+                        if ramp_down:
+                            print(r'ramp down now off')
+                            ramp_down = False
+                        else:
+                            print(r'ramp down now on')
+                            ramp_down = True
+                    elif n == 't':
+                        n = input("Enter ramp time in seconds: ")
+                        try:
+                            print(f'Setting ramp time to: {float(n)} seconds')
+                            ramp_time_d = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
+                    elif n == 'i':
+                        n = input("Enter inactive time in seconds: ")
+                        try:
+                            print(f'Setting inactive time to: {float(n)} seconds')
+                            inactive_time_d = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
+                    elif n == 'p':
+                        n = input("Enter number of ramp steps: ")
+                        try:
+                            print(f'Setting steps to: {float(n)}')
+                            ramp_inc_d = float(n)
+                        except ValueError:
+                            print('\n')
+                            print('Numbers only')
                 elif n == 'c':
                     break
         elif n == 'q':
