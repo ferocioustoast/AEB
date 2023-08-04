@@ -21,6 +21,10 @@ ramp_time = 0.8  # Time, in seconds, to ramp volume up
 ramp_inc = 20  # Number of steps to take when ramping, more adds more time
 inactive_time = 0.6  # Time, in seconds, to be at zero to trigger ramp up
 
+ramp_down = True  # Ramp volume down over ramp_time
+ramp_time_d = 0.8  # Time, in seconds, to ramp volume down
+ramp_inc_d = 20  # Number of steps to take when ramping, more adds more time
+
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
 
@@ -138,14 +142,23 @@ def select_device():
             print('\n')
 
 
-def ramp_volume_up():
-    if verbose:
-        print('At zero ramping up...')
-    for i in range(round(ramp_inc) + 1):
+def ramp_volume(ramp):
+    if ramp == 'up':
         if verbose:
-            print(f'{(i / ramp_inc)} / 1.0')
-        mixer.Sound.set_volume(sound, (i / ramp_inc))
-        time.sleep(ramp_time / ramp_inc)
+            print('Ramping volume up...')
+        for i in range(round(ramp_inc) + 1):
+            if verbose:
+                print(f'{(i / ramp_inc)} / 1.0')
+            mixer.Sound.set_volume(sound, (i / ramp_inc))
+            time.sleep(ramp_time / ramp_inc)
+    elif ramp == 'down':
+        if verbose:
+            print('Ramping volume down...')
+        for i in reversed(range(round(ramp_inc_d) + 1)):
+            if verbose:
+                print(f'{(i / ramp_inc_d)} / 1.0')
+            mixer.Sound.set_volume(sound, (i / ramp_inc_d))
+            time.sleep(ramp_time_d / ramp_inc_d)
 
 
 def control_motor(motor):
@@ -162,9 +175,9 @@ def control_motor(motor):
     rvol = find_r_vol(motor, rminvol, rmaxvol)
 
     if ramp_up and last_zero and time.time() - zero_time >= inactive_time:
-        volume_ramp_up_thread = threading.Thread(target=ramp_volume_up)
+        volume_ramp_thread = threading.Thread(target=ramp_volume, args=('up',))
         mixer.Sound.set_volume(sound, 0.0)
-        volume_ramp_up_thread.start()
+        volume_ramp_thread.start()
 
     if not half_way:
         mixer.Channel(0).set_volume(lvol, rvol)
