@@ -53,5 +53,6 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - mi : Change the left/right or both channels minimum volumes; they must be in between 0.0 and 1.0.
 - ma : Change the left/right or both channels maximum volumes; they must be in between 0.0 and 1.0.
 - r  : Edit or see ramp-up settings
+- rd : Edit or see ramp-down settings
 - c  : Leave the control menu
 - p  : Pauses the sound
