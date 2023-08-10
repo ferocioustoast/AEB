@@ -52,6 +52,8 @@ did = ''
 
 zero_time = 0
 last_zero = True
+old_motor = 0
+ramp_start = 0
 
 
 def open_programs(programs):
@@ -144,17 +146,16 @@ def select_device():
 
 
 def ramp_volume(ramp):
+    # Ramp the volume of Sound up or down over the set time
+    if verbose:
+        print(f'Ramping volume {ramp}...')
     if ramp == 'up':
-        if verbose:
-            print('Ramping volume up...')
         for i in range(round(ramp_inc) + 1):
             if verbose:
                 print(f'{(i / ramp_inc)} / 1.0')
             mixer.Sound.set_volume(sound, (i / ramp_inc))
             time.sleep(ramp_time / ramp_inc)
     elif ramp == 'down':
-        if verbose:
-            print('Ramping volume down...')
         for i in reversed(range(round(ramp_inc_d) + 1)):
             if verbose:
                 print(f'{(i / ramp_inc_d)} / 1.0')
@@ -162,9 +163,20 @@ def ramp_volume(ramp):
             time.sleep(ramp_time_d / ramp_inc_d)
 
 
-def control_motor(motor):
+def ramp_check(motor):
+    # Check if the motor is still at old_motor after waiting inactive_time_d
+    global last_zero
+    if old_motor == motor and time.time() - ramp_start >= inactive_time_d:
+        ramp_volume('down')
+        last_zero = True
+
+
+def volume_from_motor(motor):
+    # Set the volume of the left and right channels based on the motor value
     global zero_time
     global last_zero
+    global old_motor
+    global ramp_start
     if not check_rumble(motor):
         if ramp_up:
             zero_time = time.time()
@@ -176,14 +188,19 @@ def control_motor(motor):
     rvol = find_r_vol(motor, rminvol, rmaxvol)
 
     if ramp_up and last_zero and time.time() - zero_time >= inactive_time:
-        volume_ramp_thread = threading.Thread(target=ramp_volume, args=('up',))
+        volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
         mixer.Sound.set_volume(sound, 0.0)
-        volume_ramp_thread.start()
+        volume_ramp_up_thread.start()
 
     if not half_way:
         mixer.Channel(0).set_volume(lvol, rvol)
         last_zero = False
-            return
+        if ramp_down:
+            old_motor = motor
+            ramp_start = time.time()
+            ramp_check_timer = threading.Timer(inactive_time_d, ramp_check, args=(motor,))
+            ramp_check_timer.start()
+        return
 
         if motor < half_rum:
             mixer.Channel(0).set_volume(lvol, rminvol)
@@ -192,6 +209,12 @@ def control_motor(motor):
                 mixer.Channel(0).set_volume(lmaxvol, rvol)
             else:
                 mixer.Channel(0).set_volume(lminvol, rvol)
+
+        if ramp_down:
+            old_motor = motor
+            ramp_start = time.time()
+            ramp_check_timer = threading.Timer(inactive_time_d, ramp_check, args=(motor,))
+            ramp_check_timer.start()
         last_zero = False
 
 
@@ -205,7 +228,7 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
 
     motor = max(small_motor, large_motor)
 
-    control_motor(motor)
+    volume_from_motor(motor)
 
 
 def print_help():
@@ -251,9 +274,9 @@ def print_controls():
     else:
         print('r  : Edit ramp_up [off] settings')
     if ramp_down:
-        print('r  : Edit ramp_down [on] settings')
+        print('rd  : Edit ramp_down [on] settings')
     else:
-        print('r  : Edit ramp_down [off] settings')
+        print('rd  : Edit ramp_down [off] settings')
     print('c  : Leave the control menu')
     if pause:
         print('p  : Toggle the sound on and [off]')
