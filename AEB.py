@@ -17,14 +17,14 @@ rminvol = 0.4  # Right minimum volume: 0.4
 amp = 1  # Number used to multiply the sinewave by: 1
 
 ramp_up = True  # If at zero for inactive_time, ramp volume up over ramp_time
-ramp_time = 0.3  # Time, in seconds, to ramp volume up
-ramp_inc = 20  # Number of steps to take when ramping, more adds more time
-inactive_time = 0.1  # Time, in seconds, to be at zero to trigger ramp up
+ramp_time = 0.3  # Time, in seconds, to ramp volume up: 0.3
+ramp_inc = 20  # Number of steps to take when ramping, more adds more time: 20
+inactive_time = 0.1  # Time, in seconds, to be at zero to trigger ramp up: 0.1
 
 ramp_down = True  # Ramp volume down over ramp_time_d
-ramp_time_d = 0.3  # Time, in seconds, to ramp volume down
-ramp_inc_d = 20  # Number of steps to take when ramping, more adds more time
-inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down
+ramp_time_d = 0.3  # Time, in seconds, to ramp volume down: 0.3
+ramp_inc_d = 20  # Number of steps to take when ramping more adds more time: 20
+inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down: 0.5
 
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
