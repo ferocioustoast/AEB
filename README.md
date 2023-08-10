@@ -10,7 +10,7 @@ As vgamepad uses ViGEm, which is Windows only, <b>this will only work for Window
 
 ### Installation
 
-_Assuming you already have [Python](https://www.python.org/downloads/) installed_,
+_Assuming you already have [Python](https://www.python.org/downloads/) installed_, and added to PATH.
 
 1. Download AEB.py and requirements.txt from this repo.
 
