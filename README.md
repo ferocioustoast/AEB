@@ -10,7 +10,7 @@ As vgamepad uses ViGEm, which is Windows only, <b>this will only work for Window
 
 ### Installation
 
-_Assuming you already have [Python](https://www.python.org/downloads/) installed_, and added to PATH.
+_Assuming you already have [Python](https://www.python.org/downloads/) installed, and added to PATH._
 
 1. Download AEB.py and requirements.txt from this repo.
 
@@ -38,7 +38,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - vv : Toggles showing the motor states
 - x  : Presses the 'start' button four times on the virtual controller
 - h  : Enables the old way of switching channels at _half_rum_
-   - e  : _Only shows if h was used._ Sets the left channel volume to _lmaxvol_ when over _half_rum_, instead of _lminvol_.
+- e  : Allows the left channel volume to grow to _lmaxvol_ when over _half_rum_
 - p  : Pauses the sound
 - l  : Opens any programs manually added to the list in AEB.py.
 - c  : Enters the control menu _(see control menu hotkeys below)_.

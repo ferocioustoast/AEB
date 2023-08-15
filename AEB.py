@@ -27,7 +27,7 @@ ramp_inc_d = 20  # Number of steps to take when ramping more adds more time: 20
 inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down: 0.5
 
 half_way = False  # Old way, use half_rum to switch channels
-extended = False  # Used with half_way, keep lvol at lmaxvol after half_rum
+extended = False  # Increase lvol after half_rum, otherwise stay at lminvol
 
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states
@@ -42,7 +42,7 @@ programs = [  # list of programs to launch
     # r'C:\Windows\notepad.exe',  # opens notepad exe directly
 ]
 
-# Changing half_rum can lead to math problems, only used in half_way
+# Changing half_rum can lead to math problems
 half_rum = 127.5  # Used to switch channels, Calculate steps: 127.5
 
 sample_rate = 44100  # Sample rate for sinewave: 44100
@@ -50,10 +50,10 @@ sample_rate = 44100  # Sample rate for sinewave: 44100
 # Empty string to store selected audio device in
 did = ''
 
-zero_time = 0
-last_zero = True
-old_motor = 0
-ramp_start = 0
+zero_time = 0  # Time when hit zero
+last_zero = True  # Last motor at zero
+old_motor = 0  # Motor for checking ramp_down
+ramp_start = 0  # Time for triggering ramp_down
 
 
 def open_programs(programs):
@@ -89,7 +89,12 @@ def find_l_vol(motor, lminvol, lmaxvol):
     # Calculate the needed left volume
     # Start at lmaxvol and lower to lminvol
     if half_way:
-        lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_rum
+        if motor >= half_rum:
+            lvol = lminvol
+        else:
+            lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_rum
+    if extended and motor >= half_rum:
+        lvol = lminvol + (lmaxvol - lminvol) * motor / 255
     else:
         lvol = lmaxvol + (lminvol - lmaxvol) * motor / 255
     lvol = max(lminvol, min(lmaxvol, lvol))
@@ -102,9 +107,12 @@ def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
     if half_way:
-        rvol = rminvol + (rmaxvol - rminvol) * (motor - half_rum) / half_rum
+        if motor <= half_rum:
+            rvol = rminvol
+        else:
+            rvol = rminvol + (rmaxvol - rminvol) * (motor - half_rum) / half_rum
     else:
-        rvol = rminvol + (rmaxvol - rminvol) * (motor) / 255
+        rvol = rminvol + (rmaxvol - rminvol) * motor / 255
     rvol = max(rminvol, min(rmaxvol, rvol))
     if verbose:
         print(f'rvol: {rvol}')
@@ -192,30 +200,14 @@ def volume_from_motor(motor):
         mixer.Sound.set_volume(sound, 0.0)
         volume_ramp_up_thread.start()
 
-    if not half_way:
-        mixer.Channel(0).set_volume(lvol, rvol)
-        last_zero = False
-        if ramp_down:
-            old_motor = motor
-            ramp_start = time.time()
-            ramp_check_timer = threading.Timer(inactive_time_d, ramp_check, args=(motor,))
-            ramp_check_timer.start()
-        return
+    mixer.Channel(0).set_volume(lvol, rvol)
+    last_zero = False
 
-        if motor < half_rum:
-            mixer.Channel(0).set_volume(lvol, rminvol)
-        else:
-            if extended:
-                mixer.Channel(0).set_volume(lmaxvol, rvol)
-            else:
-                mixer.Channel(0).set_volume(lminvol, rvol)
-
-        if ramp_down:
-            old_motor = motor
-            ramp_start = time.time()
-            ramp_check_timer = threading.Timer(inactive_time_d, ramp_check, args=(motor,))
-            ramp_check_timer.start()
-        last_zero = False
+    if ramp_down:
+        old_motor = motor
+        ramp_start = time.time()
+        ramp_check_timer = threading.Timer(inactive_time_d, ramp_check, args=(motor,))
+        ramp_check_timer.start()
 
 
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
@@ -246,10 +238,9 @@ def print_help():
         print('h : Toggle half_way mode [on] and off')
     else:
         print('h : Toggle half_way mode on and [off]')
-    if half_way:
-        if extended:
-            print('e : Toggle extended [on] and off')
-        else:
+    if extended:
+        print('e : Toggle extended [on] and off')
+    else:
             print('e : Toggle extended on and [off]')
     if pause:
         print('p : Toggle the sound on and [off]')
