@@ -26,7 +26,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 2. Select the output device you want the audio to play on.
 
-3. Use a program such as [Intiface](https://intiface.com/central/) that can connect to the X360 controller and control the rumble.
+3. Pressing 't' will start a customizable loop changing the left and right channel volumes, or use a program such as [Intiface](https://intiface.com/central/) that can connect to the X360 controller and control the rumble.
 
 4. As the virtual controller receives rumble, the left and right channels volumes will change depending on the rumble. Play around with the hotkeys shown or edit the py file directly to customize the feeling.
 
@@ -40,6 +40,10 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - h  : Enables the old way of switching channels at _half_rum_
 - e  : Allows the left channel volume to grow to _lmaxvol_ when over _half_rum_
 - p  : Pauses the sound
+- t  : Start looping though a customizable range
+  -  s  : Change the amount of time, _in seconds,_ to take per loop.
+  -  ma : Change the maximum motor number of the loop. _highest is 255_
+  -  mi : Change the minimum motor number of the loop. _lowest is 0_
 - l  : Opens any programs manually added to the list in AEB.py.
 - c  : Enters the control menu _(see control menu hotkeys below)_.
 - q  : Closes the program

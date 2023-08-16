@@ -26,6 +26,10 @@ ramp_time_d = 0.3  # Time, in seconds, to ramp volume down: 0.3
 ramp_inc_d = 20  # Number of steps to take when ramping more adds more time: 20
 inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down: 0.5
 
+loop_time = 0.5  # Time, in seconds, to go between minloop, maxloop: 0.5
+minloop, maxloop = 1, 255  # range to loop through: 1, 255
+looping = False  # whether we are looping
+
 half_way = False  # Old way, use half_rum to switch channels
 extended = False  # Increase lvol after half_rum, otherwise stay at lminvol
 
@@ -93,7 +97,7 @@ def find_l_vol(motor, lminvol, lmaxvol):
             lvol = lminvol
         else:
             lvol = lmaxvol + (lminvol - lmaxvol) * motor / half_rum
-    if extended and motor >= half_rum:
+    if extended and motor > half_rum:
         lvol = lminvol + (lmaxvol - lminvol) * motor / 255
     else:
         lvol = lmaxvol + (lminvol - lmaxvol) * motor / 255
@@ -107,7 +111,7 @@ def find_r_vol(motor, rminvol, rmaxvol):
     # Calculate the needed right volume
     # Start at rminvol and increase to rmaxvol
     if half_way:
-        if motor <= half_rum:
+        if motor < half_rum:
             rvol = rminvol
         else:
             rvol = rminvol + (rmaxvol - rminvol) * (motor - half_rum) / half_rum
@@ -192,7 +196,7 @@ def volume_from_motor(motor):
         mixer.Channel(0).set_volume(0.0, 0.0)
         return
 
-    if not ramp_up:
+    if ramp_down and not ramp_up:
         mixer.Sound.set_volume(sound, 1.0)
 
     lvol = find_l_vol(motor, lminvol, lmaxvol)
@@ -226,6 +230,36 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     volume_from_motor(motor)
 
 
+def loop_motor():
+    print("Starting Loop...")
+    if ramp_up:
+        volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
+        mixer.Sound.set_volume(sound, 0.0)
+        volume_ramp_up_thread.start()
+
+    while not loop.is_set():
+        for i in range(minloop, maxloop + 1):
+            if loop.is_set():
+                break
+            total_steps = maxloop - minloop + 1
+            step_time = loop_time / total_steps
+            volume_from_motor(i)
+            timer = time.time()
+            while timer + step_time > time.time():
+                pass
+        for i in reversed(range(minloop, maxloop + 1)):
+            if loop.is_set():
+                break
+            total_steps = maxloop - minloop + 1
+            step_time = loop_time / total_steps
+            volume_from_motor(i)
+            timer = time.time()
+            while timer + step_time > time.time():
+                pass
+    loop.clear()
+    print("Ending Loop...")
+
+
 def print_help():
     print('\n')
     if verbose:
@@ -244,7 +278,14 @@ def print_help():
     if extended:
         print('e : Toggle extended [on] and off')
     else:
-            print('e : Toggle extended on and [off]')
+        print('e : Toggle extended on and [off]')
+    if looping:
+        print('t : Stop looping')
+        print(f's : Change loop time [{loop_time}] of loop')
+        print(f'ma : Change max loop [{maxloop}]')
+        print(f'mi : Change min loop [{minloop}]')
+    else:
+        print('t : Start looping')
     if pause:
         print('p : Toggle the sound on and [off]')
     else:
@@ -524,6 +565,50 @@ Do you have any active audio devices?')
                             print('Numbers only')
                 elif n == 'c':
                     break
+        elif n == 't':
+            if not looping:
+                looping = True
+                loop = threading.Event()
+                random_thread = threading.Thread(target=loop_motor)
+                random_thread.start()
+            else:
+                loop.set()
+                looping = False
+        elif n == 's' and looping:
+            try:
+                print(f'Current loop time: {loop_time}')
+                n = input("Enter desired loop time: ")
+                print(f'Setting loop time to {n}...')
+                loop_time = float(n)
+            except ValueError:
+                print('\n')
+                print('Numbers only')
+        elif n == 'ma' and looping:
+            try:
+                print(f'Current max loop: {maxloop}')
+                n = input("Enter desired max loop between 1 and 255: ")
+                assert int(n) >= 1 and int(n) <= 255
+                print(f'Setting max loop to {n}...')
+                maxloop = int(n)
+            except ValueError:
+                print('\n')
+                print('Numbers only')
+            except AssertionError:
+                print('\n')
+                print('Numbers between 1 and 255 only')
+        elif n == 'mi' and looping:
+            try:
+                print(f'Current min loop: {minloop}')
+                n = input("Enter desired min loop between 0 and 254: ")
+                assert int(n) >= 0 and int(n) <= 254
+                print(f'Setting min loop to {n}...')
+                minloop = int(n)
+            except ValueError:
+                print('\n')
+                print('Numbers only')
+            except AssertionError:
+                print('\n')
+                print('Numbers between 0 and 254 only')
         elif n == 'q':
             print('Quitting...')
             mixer.quit()
