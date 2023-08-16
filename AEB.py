@@ -192,6 +192,9 @@ def volume_from_motor(motor):
         mixer.Channel(0).set_volume(0.0, 0.0)
         return
 
+    if not ramp_up:
+        mixer.Sound.set_volume(sound, 1.0)
+
     lvol = find_l_vol(motor, lminvol, lmaxvol)
     rvol = find_r_vol(motor, rminvol, rmaxvol)
 
