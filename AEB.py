@@ -36,6 +36,7 @@ extended = False  # Increase lvol after half_rum, otherwise stay at lminvol
 verbose = False  # spam volumes
 very_verbose = False  # Spam motor states
 
+never_zero = False  # Skip setting the volume to 0 if at 0 motor
 buttons = False  # Press start button four times
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
@@ -189,11 +190,15 @@ def volume_from_motor(motor):
     global last_zero
     global old_motor
     global ramp_start
+
     if not check_rumble(motor):
         if ramp_up:
             zero_time = time.time()
             last_zero = True
-        mixer.Channel(0).set_volume(0.0, 0.0)
+        if never_zero:
+            pass
+        else:
+            mixer.Channel(0).set_volume(0.0, 0.0)
         return
 
     if ramp_down and not ramp_up:
