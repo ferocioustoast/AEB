@@ -403,7 +403,7 @@ Do you have any active audio devices?')
                         n = input("Enter desired frequency: ")
                         print(f'Setting frequency to {n}...')
                         mixer.stop()
-                        frequency = n
+                        frequency = int(n)
                         sound = mixer.Sound(generate_sinewave(frequency, sample_rate, amp))
                         mixer.Channel(0).set_volume(0.0, 0.0)
                         sound.play(-1)
