@@ -41,6 +41,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - e  : Allows the left channel volume to grow to _lmaxvol_ when over _half_rum_
 - p  : Pauses the sound
 - t  : Start looping though a customizable range
+  -  rs : Enable random changes to speed, increasing over time. _max speed in ~15 minutes_
   -  s  : Change the amount of time, _in seconds,_ to take per loop.
   -  ma : Change the maximum motor number of the loop. _highest is 255_
   -  mi : Change the minimum motor number of the loop. _lowest is 0_

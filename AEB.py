@@ -26,8 +26,10 @@ ramp_time_d = 0.3  # Time, in seconds, to ramp volume down: 0.3
 ramp_inc_d = 20  # Number of steps to take when ramping more adds more time: 20
 inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down: 0.5
 
+random_looping = False  # whether to randomize the speed of the loop
 loop_time = 0.5  # Time, in seconds, to go between minloop, maxloop: 0.5
 minloop, maxloop = 1, 255  # range to loop through: 1, 255
+minloopspeed = 2  # Time, in seconds, for the slowest possible loop_time: 2
 looping = False  # whether we are looping
 
 half_way = False  # Old way, use half_rum to switch channels
@@ -236,6 +238,8 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
 
 
 def loop_motor():
+    global loop_time
+    multi = 0.90
     print("Starting Loop...")
     if ramp_up:
         volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
@@ -252,6 +256,7 @@ def loop_motor():
             timer = time.time()
             while timer + step_time > time.time():
                 pass
+
         for i in reversed(range(minloop, maxloop + 1)):
             if loop.is_set():
                 break
@@ -261,6 +266,29 @@ def loop_motor():
             timer = time.time()
             while timer + step_time > time.time():
                 pass
+
+        if random_looping:
+            import random
+            loop_time *= multi
+
+            # Randomly increase the loop time with a decreasing probability.
+            if random.randint(1, 2) == 1:
+                multi -= 0.001
+                if random.randint(1, 10) == 1:
+                    loop_time += 0.001
+                elif random.randint(1, 10) == 2:
+                    loop_time += 0.01
+                elif random.randint(1, 10) == 3:
+                    loop_time += 0.1
+                elif random.randint(1, 10) == 4:
+                    loop_time += 1.0
+
+                # Set loop_time to a fast speed after reaching low multi
+                if multi < 0:
+                    loop_time = 0.0000001
+
+            loop_time = min(loop_time, minloopspeed)
+
     loop.clear()
     print("Ending Loop...")
 
@@ -272,9 +300,9 @@ def print_help():
     else:
         print('v : Toggle verbose mode on and [off]')
     if very_verbose:
-        print('vv : Toggle very verbose mode [on] and off')
+        print('vv: Toggle very verbose mode [on] and off')
     else:
-        print('vv : Toggle very verbose mode on and [off]')
+        print('vv: Toggle very verbose mode on and [off]')
     print('x : Spam buttons')
     if half_way:
         print('h : Toggle half_way mode [on] and off')
@@ -286,9 +314,13 @@ def print_help():
         print('e : Toggle extended on and [off]')
     if looping:
         print('t : Stop looping')
-        print(f's : Change loop time [{loop_time}] of loop')
+        print(f's : Change loop time [{round(loop_time, 6)}] of loop')
         print(f'ma : Change max loop [{maxloop}]')
         print(f'mi : Change min loop [{minloop}]')
+        if random_looping:
+            print('rs : Toggle random speed [on] and off')
+        else:
+            print('rs : Toggle random speed on and [off]')
     else:
         print('t : Start looping')
     if pause:
@@ -314,9 +346,9 @@ def print_controls():
     else:
         print('r  : Edit ramp_up [off] settings')
     if ramp_down:
-        print('rd  : Edit ramp_down [on] settings')
+        print('rd : Edit ramp_down [on] settings')
     else:
-        print('rd  : Edit ramp_down [off] settings')
+        print('rd : Edit ramp_down [off] settings')
     print('c  : Leave the control menu')
     if pause:
         print('p  : Toggle the sound on and [off]')
@@ -614,6 +646,13 @@ Do you have any active audio devices?')
             except AssertionError:
                 print('\n')
                 print('Numbers between 0 and 254 only')
+        elif n == 'rs' and looping:
+            if not random_looping:
+                print(f'Enabling random_looping')
+                random_looping = True
+            else:
+                print(f'Disabling random_looping')
+                random_looping = False
         elif n == 'q':
             print('Quitting...')
             mixer.quit()
