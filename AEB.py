@@ -28,6 +28,12 @@ inactive_time_d = 0.5  # Time, in seconds, to trigger ramp down: 0.5
 
 random_looping = False  # whether to randomize the speed of the loop
 loop_time = 0.5  # Time, in seconds, to go between minloop, maxloop: 0.5
+random_range = False  # whether to randomize the loop range using {ranges}
+ranges = {  # ranges will randomly be + or - 0 through 38
+    0: [1, 255],
+    1: [1, 55],
+    2: [201, 255],
+}
 minloop, maxloop = 1, 255  # range to loop through: 1, 255
 minloopspeed = 2  # Time, in seconds, for the slowest possible loop_time: 2
 looping = False  # whether we are looping
@@ -77,7 +83,6 @@ Please add them manually to the AEB.py file.')
 
 def spam_buttons():
     # Press the start button on the controller a few times
-    import time
     for i in range(4):
         gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_START)
         gamepad.update()
@@ -239,6 +244,7 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
 
 def loop_motor():
     global loop_time
+    global minloop, maxloop
     multi = 0.90
     print("Starting Loop...")
     if ramp_up:
@@ -266,6 +272,32 @@ def loop_motor():
             timer = time.time()
             while timer + step_time > time.time():
                 pass
+
+        if random_range:
+            # Randomly change the loop min/max using set {ranges}
+            import random
+            if random.randint(1, 10) == 8:
+                rand_range = random.choice(ranges)
+                minchange = rand_range[0]
+                maxchange = rand_range[1]
+                if random.randint(1, 2) == 1:
+                    if random.randint(1, 2) == 1:
+                        minchange += random.randint(1, 20)
+                    if random.randint(1, 2) == 1:
+                        maxchange += random.randint(1, 20)
+                    if random.randint(1, 2) == 1:
+                        minchange -= random.randint(1, 20)
+                    if random.randint(1, 2) == 1:
+                        maxchange -= random.randint(1, 20)
+
+                # Make sure min/max loop 1-255
+                minchange = max(minchange, 1)
+                minchange = min(minchange, 255)
+                maxchange = min(maxchange, 255)
+                maxchange = max(maxchange, 1)
+
+                minloop = minchange
+                maxloop = maxchange
 
         if random_looping:
             import random
@@ -321,6 +353,10 @@ def print_help():
             print('rs : Toggle random speed [on] and off')
         else:
             print('rs : Toggle random speed on and [off]')
+        if random_range:
+            print('rr : Toggle random range [on] and off')
+        else:
+            print('rr : Toggle random range on and [off]')
     else:
         print('t : Start looping')
     if pause:
@@ -653,6 +689,13 @@ Do you have any active audio devices?')
             else:
                 print(f'Disabling random_looping')
                 random_looping = False
+        elif n == 'rr' and looping:
+            if not random_range:
+                print(f'Enabling random_range')
+                random_range = True
+            else:
+                print(f'Disabling random_range')
+                random_range = False
         elif n == 'q':
             print('Quitting...')
             mixer.quit()
