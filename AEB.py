@@ -9,9 +9,9 @@ import os
 frequency = 987  # Frequency, in hertz, to play sinewave at: 987
 
 # Volume can be set between 0.0 and 1.0
-lmaxvol = 0.5  # Left maximum volume: 0.5
+lmaxvol = 0.8  # Left maximum volume: 0.8
 lminvol = 0.4  # Left minimum volume: 0.4
-rmaxvol = 0.5  # Right maximum volume: 0.5
+rmaxvol = 0.8  # Right maximum volume: 0.8
 rminvol = 0.4  # Right minimum volume: 0.4
 
 amp = 1  # Number used to multiply the sinewave by: 1
