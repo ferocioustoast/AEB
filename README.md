@@ -8,7 +8,14 @@ The program plays a sinewave and emulates an X360 controller that can connect to
 
 As vgamepad uses ViGEm, which is Windows only, <b>this will only work for Windows.</b>
 
-### Installation
+### Install using Executable (recommended)
+
+1. Download and install [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases/latest) _This is the driver that emulates the X360 controller_
+
+2. Download and run [AEB](https://github.com/ferocioustoast/AEB/releases/latest)
+
+
+### Install using Python
 
 _Assuming you already have [Python](https://www.python.org/downloads/) installed, and added to PATH._
 
@@ -22,7 +29,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 ### Usage
 
-1. Run AEB.py with Powershell/CMD or by double-clicking AEB.py.
+1. Run AEB with Powershell/CMD or by double-clicking AEB.
 
 2. Select the output device you want the audio to play on.
 
