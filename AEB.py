@@ -1,10 +1,19 @@
 import pygame._sdl2.audio as sdl2_audio
 from pygame import mixer
-import vgamepad as vg
 import numpy as np
 import threading
 import time
 import os
+try:
+    import vgamepad as vg
+except Exception:
+    os.system('cls')
+    n = input("ViGEmBus driver not found, Would you like to open the download page? [y]es [n]o: ")
+    if n.lower() == 'y':
+        os.startfile("https://github.com/nefarius/ViGEmBus/releases/latest")
+        quit()
+    else:
+        quit()
 
 frequency = 987  # Frequency, in hertz, to play sinewave at: 987
 
