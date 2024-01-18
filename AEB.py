@@ -54,7 +54,7 @@ verbose = False  # spam volumes
 very_verbose = False  # Spam motor states
 
 never_zero = False  # Skip setting the volume to 0 if at 0 motor
-buttons = False  # Press start button four times
+buttons = False  # Press start button four times         
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
 launch_programs = False  # auto launch below programs after selecting device
@@ -372,7 +372,8 @@ def print_help():
         print('p : Toggle the sound on and [off]')
     else:
         print('p : Toggle the sound [on] and off')
-    print('l : Launch programs added to py file')
+    if programs != []:
+        print('l : Launch programs added to py file')
     print('c : Enter the control menu')
     print('q : Close the program')
 
