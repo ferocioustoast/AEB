@@ -359,7 +359,8 @@ def print_help():
         print('vv: Toggle very verbose mode [on] and off')
     else:
         print('vv: Toggle very verbose mode on and [off]')
-    print('x : Spam buttons')
+    if not limited:
+        print('x : Spam buttons')
     if half_way:
         print('h : Toggle half_way mode [on] and off')
     else:
@@ -459,7 +460,7 @@ Do you have any active audio devices?')
             else:
                 very_verbose = True
                 print("Very verbose: On")
-        elif n == 'x':
+        elif n == 'x' and not limited:
             print("Pressing buttons...")
             spam_buttons()
         elif n == 'h':
