@@ -6,9 +6,9 @@
 
 The program plays a sinewave and emulates an X360 controller that can connect to something like [Intiface](https://intiface.com/central/), which can control the rumble of the controller. Using the rumble, we change the volume of the left and right channels of the sinewave depending on the strength of the rumble.
 
-As vgamepad uses ViGEm, which is Windows only, <b>this will only work for Windows.</b>
+As vgamepad uses ViGEm, which is Windows only, <b>the controller emulation only works in Windows.</b> However, the non-controller functions may still work on other operating systems if used with python.
 
-### Install using Executable (recommended)
+### Install using Executable (Windows only, easiest)
 
 1. Download and install [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases/latest) _This is the driver that emulates the X360 controller_
 
@@ -21,7 +21,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 1. Download AEB.py and requirements.txt from this repo.
 
-2. Install the requirements with Powershell/CMD.
+2. Install the requirements with Powershell/CMD/terminal.
    ```sh
    python -m pip install -r .\requirements.txt
    ```
