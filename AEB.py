@@ -149,15 +149,19 @@ def generate_sinewave(frequency, sample_rate, amp):
 
 def select_device():
     global did
-    print('\n')
     devs = sdl2_audio.get_audio_device_names()
     mixer.quit()
     i = 0
+    print("**Important Warning:**")
+    print("Please use a dedicated audio device for your estim device.")
+    print("If you are using only one audio device, ALL sounds will go to your estim device.")
+    print("\n")
     while 1 == 1:
         for i, d in enumerate(devs):
             print(f'{i} : {d}')
         try:
-            n = int(input("Select desired output device: "))
+            print('\n')
+            n = int(input("Enter the number matching the audio device your estim device is connected to: "))
             print('\n')
             print(f'Connecting to: {devs[n]}')
             print('\n')
