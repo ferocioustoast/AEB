@@ -2,18 +2,26 @@ import pygame._sdl2.audio as sdl2_audio
 from pygame import mixer
 import numpy as np
 import threading
+import platform
 import time
 import os
 try:
     import vgamepad as vg
+    limited = False
 except Exception:
     os.system('cls')
-    n = input("ViGEmBus driver not found, Would you like to open the download page? [y]es [n]o: ")
-    if n.lower() == 'y':
-        os.startfile("https://github.com/nefarius/ViGEmBus/releases/latest")
-        quit()
+    if platform.system() == 'Windows':
+        n = input("ViGEmBus driver not found, Would you like to open the download page? [y]es [n]o: ")
+        os.system('cls')
+        if n.lower() == 'y' or n == '' or n.lower() == 'yes':
+            os.startfile("https://github.com/nefarius/ViGEmBus/releases/latest")
+        n = input("Would you like to continue with no controller functions? [y]es [n]o: ")
+        if n.lower() == 'y' or n == '' or n.lower() == 'yes':
+            limited = True
+        else:
+            quit()
     else:
-        quit()
+        limited = True
 
 frequency = 987  # Frequency, in hertz, to play sinewave at: 987
 
@@ -340,6 +348,9 @@ def loop_motor():
 
 def print_help():
     print('\n')
+    if limited:
+        print('Running without controller functions')
+        print('\n')
     if verbose:
         print('v : Toggle verbose mode [on] and off')
     else:
@@ -426,9 +437,10 @@ Do you have any active audio devices?')
     sound.play(-1)
 
     # start 360 controller, set rumble callback
-    gamepad = vg.VX360Gamepad()
+    if not limited:
+        gamepad = vg.VX360Gamepad()
 
-    gamepad.register_notification(callback_function=rumble)
+        gamepad.register_notification(callback_function=rumble)
 
     while 1 == 1:
         print_help()
