@@ -19,7 +19,7 @@ As vgamepad uses ViGEm, which is Windows only, <b>the controller emulation only 
 
 _Assuming you already have [Python](https://www.python.org/downloads/) installed, and added to PATH._
 
-1. Download AEB.py and requirements.txt from this repo.
+1. Clone this repo.
 
 2. Install the requirements with Powershell/CMD/terminal.
    ```sh
@@ -35,7 +35,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 
 3. Pressing 't' will start a customizable loop changing the left and right channel volumes, or use a program such as [Intiface](https://intiface.com/central/) that can connect to the X360 controller and control the rumble.
 
-4. As the virtual controller receives rumble, the left and right channels volumes will change depending on the rumble. Play around with the hotkeys shown or edit the py file directly to customize the feeling.
+4. As the virtual controller receives rumble, the left and right channel volumes will change depending on the rumble. Play around with the hotkeys shown or edit the config file generated after running once to customize the feeling.
 
 #### Main Menu Hotkeys
 
@@ -68,4 +68,6 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 - r  : Edit or see ramp-up settings
 - rd : Edit or see ramp-down settings
 - c  : Leave the control menu
+- l  : Load a config file of your choice; if the file is not found, it will create a new one.
+- s  : Save all changed settings to a config file. By default, it will save to the currently loaded config, but you can create a new one.
 - p  : Pauses the sound
