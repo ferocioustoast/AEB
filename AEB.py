@@ -173,7 +173,7 @@ def find_l_vol(motor, lminvol, lmaxvol):
         lvol = lmaxvol + (lminvol - lmaxvol) * motor / 255
     lvol = max(lminvol, min(lmaxvol, lvol))
     if settings['print_volumes']:
-        print(f'lvol: {lvol}')
+        print(f'Left Volume: {lvol}')
     return lvol
 
 
@@ -191,7 +191,7 @@ def find_r_vol(motor, rminvol, rmaxvol):
         rvol = rminvol + (rmaxvol - rminvol) * motor / 255
     rvol = max(rminvol, min(rmaxvol, rvol))
     if settings['print_volumes']:
-        print(f'rvol: {rvol}')
+        print(f'Right Volume: {rvol}')
     return rvol
 
 
@@ -308,7 +308,7 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     :param small_motor: integer in [0, 255]
     """
     if settings['print_motor_states']:
-        print(f'small_motor: {small_motor}, large_motor: {large_motor}')
+        print(f'Small Motor: {small_motor}, Large Motor: {large_motor}')
 
     motor = max(small_motor, large_motor)
 
