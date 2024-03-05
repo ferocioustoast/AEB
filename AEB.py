@@ -661,82 +661,54 @@ Do you have any active audio devices?')
                         print('Resuming sound')
                         pause = False
                         mixer.unpause()
-                elif n == 'r':
-                    if settings['ramp_up_enabled']:
-                        print(f'ramp up currently: on')
-                    else:
-                        print(f'ramp up currently: off')
-                    print(f'ramp up over {settings["ramp_up_time"]} seconds, over {settings["ramp_up_steps"]} steps, if at zero for {settings["idle_time_before_ramp_up"]} seconds')
-                    n = input("Toggle [r]amp_up, ramp_[t]ime, ram[p]_inc, [i]nactive_time: ")
+                elif n == 'r' or n == 'rd':
                     if n == 'r':
-                        if settings['ramp_up_enabled']:
-                            print(r'ramp up now off')
-                            settings['ramp_up_enabled'] = False
-                        else:
-                            print(r'ramp up now on')
-                            settings['ramp_up_enabled'] = True
-                    elif n == 't':
-                        n = input("Enter ramp time in seconds: ")
-                        try:
-                            print(f'Setting ramp time to: {float(n)} seconds')
-                            settings['ramp_up_time'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
-                    elif n == 'i':
-                        n = input("Enter inactive time in seconds: ")
-                        try:
-                            print(f'Setting inactive time to: {float(n)} seconds')
-                            settings['idle_time_before_ramp_up'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
-                    elif n == 'p':
-                        n = input("Enter number of ramp steps: ")
-                        try:
-                            print(f'Setting steps to: {float(n)}')
-                            settings['ramp_up_steps'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
-                elif n == 'rd':
-                    if settings['ramp_down_enabled']:
-                        print(f'ramp down currently: on')
+                        _ = 'up'
                     else:
-                        print(f'ramp down currently: off')
-                    print(f'ramp down over {settings["ramp_down_time"]} seconds, over {settings["ramp_down_steps"]} steps, if inactive for {settings["idle_time_before_ramp_down"]} seconds')
-                    n = input("Toggle [r]amp_down, ramp_[t]ime_d, ram[p]_inc_d, [i]nactive_time_d: ")
-                    if n == 'r':
-                        if settings['ramp_down_enabled']:
-                            print(r'ramp down now off')
-                            settings['ramp_down_enabled'] = False
+                        _ = 'down'
+                    while 1 == 1:
+                        print('\n')
+                        if settings[f'ramp_{_}_enabled']:
+                            print(f'[1] Ramp {_} currently: Enabled')
                         else:
-                            print(r'ramp down now on')
-                            settings['ramp_down_enabled'] = True
-                    elif n == 't':
-                        n = input("Enter ramp time in seconds: ")
-                        try:
-                            print(f'Setting ramp time to: {float(n)} seconds')
-                            settings['ramp_down_time'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
-                    elif n == 'i':
-                        n = input("Enter inactive time in seconds: ")
-                        try:
-                            print(f'Setting inactive time to: {float(n)} seconds')
-                            settings['idle_time_before_ramp_down'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
-                    elif n == 'p':
-                        n = input("Enter number of ramp steps: ")
-                        try:
-                            print(f'Setting steps to: {float(n)}')
-                            settings['ramp_down_steps'] = float(n)
-                        except ValueError:
-                            print('\n')
-                            print('Numbers only')
+                            print(f'[1] Ramp {_} currently: Disabled')
+                        print(f'[2] Ramp {_} time: {settings[f"ramp_{_}_time"]} seconds')
+                        print(f'[3] Ramp {_} steps: {settings[f"ramp_{_}_steps"]}')
+                        print(f'[4] Idle time before ramp {_}: {settings[f"idle_time_before_ramp_{_}"]} seconds')
+                        n = input("\nEnter the number matching the option you wish to change (or press enter to leave): ")
+                        if n == '1':
+                            if settings[f'ramp_{_}_enabled']:
+                                print(f'Disabling ramp {_}')
+                                settings[f'ramp_{_}_enabled'] = False
+                            else:
+                                print(f'Enabling ramp {_}')
+                                settings[f'ramp_{_}_enabled'] = True
+                        elif n == '2':
+                            n = input(f"Enter new ramp {_} time in seconds: ")
+                            try:
+                                settings[f'ramp_{_}_time'] = float(n)
+                                print(f'Setting ramp {_} time to: {float(n)} seconds')
+                            except ValueError:
+                                print('\n')
+                                print('Numbers only')
+                        elif n == '3':
+                            n = input(f"Enter new number of ramp {_} steps: ")
+                            try:
+                                settings[f'ramp_{_}_steps'] = float(n)
+                                print(f'Setting ramp {_} steps to: {float(n)}')
+                            except ValueError:
+                                print('\n')
+                                print('Numbers only')
+                        elif n == '4':
+                            n = input("Enter new idle time in seconds: ")
+                            try:
+                                settings[f'idle_time_before_ramp_{_}'] = float(n)
+                                print(f'Setting idle time to: {float(n)} seconds')
+                            except ValueError:
+                                print('\n')
+                                print('Numbers only')
+                        else:
+                            break
                 if n == 'l':
                     configs = []
                     for file in os.listdir(os.getcwd()):
