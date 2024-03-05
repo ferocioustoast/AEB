@@ -68,7 +68,7 @@ settings = {
     'print_volumes': False,  # Print volume changes to console
     'print_motor_states': False,  # Print motor states to console
 
-    'always_set_volume': False,  # Avoid 0 volume when motor is 0
+    'always_set_volume': False,  # Set zero volume when motor is zero
 
     'launch_programs_on_select': False,  # Launch programs on device selection
     'program_list': [  # list of programs to launch
@@ -275,7 +275,7 @@ def volume_from_motor(motor):
         if settings['ramp_up_enabled']:
             zero_time = time.time()
             last_zero = True
-        if settings['always_set_volume']:
+        if not settings['always_set_volume']:
             pass
         else:
             mixer.Channel(0).set_volume(0.0, 0.0)
