@@ -10,7 +10,10 @@ try:
     import vgamepad as vg
     controller_available = True
 except Exception:
-    os.system('cls')
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
     if platform.system() == 'Windows':
         n = input("ViGEmBus driver not found, Would you like to open the download page? [y]es [n]o: ")
         os.system('cls')
@@ -483,7 +486,10 @@ def print_controls():
 
 if __name__ == '__main__':
     # setup mixer
-    os.system('cls')
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
     try:
         mixer.init(size=32)
     except Exception:
