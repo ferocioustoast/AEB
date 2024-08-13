@@ -57,7 +57,10 @@ settings = {
         2: [201, 255],
     },
 
-    'randomize_loop_speed': False,
+    'randomize_loop_speed': False,  # Randomly increase speed, sometimes lowering
+    'delay_loop_speed': False,  # Delay starting random loop speed
+    'loop_speed_delay': 60,  # Time in seconds to delay loop speed
+
     'randomize_loop_range': False,  # Randomize loop range using loop_ranges
 
     'min_loop': 1,  # Minimum value for loop
@@ -318,9 +321,22 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     volume_from_motor(motor)
 
 
+def delay_speed(delay=settings['delay_loop_speed']):
+    time.sleep(0.1)
+    time.sleep(delay)
+    print('Enabling random loop speed...')
+    settings['randomize_loop_speed'] = True
+
+
 def loop_motor():
     multi = 0.90
     print("Starting Loop...")
+
+    if settings['delay_loop_speed']:
+        settings['randomize_loop_speed'] = False
+        delay_speed_thread = threading.Thread(target=delay_speed)
+        delay_speed_thread.start()
+
     if settings['ramp_up_enabled']:
         volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
         mixer.Sound.set_volume(sound, 0.0)
@@ -435,12 +451,17 @@ def print_help():
             print('  rs : Disable random loop speed')
         else:
             print('  rs : Enable random loop speed')
+        if not settings['delay_loop_speed']:
+            print('  rsd : Enable delayed random loop speed')
         if settings['randomize_loop_range']:
             print('  rr : Disable random loop range')
         else:
             print('  rr : Enable random loop range')
     else:
-        print('t : Start looping')
+        if settings['delay_loop_speed']:
+            print('t : Start looping (delayed speed)')
+        else:
+            print('t : Start looping')
 
     if pause:
         print('p : Unpause all sounds')
@@ -793,6 +814,16 @@ Do you have any active audio devices?')
             else:
                 print(f'Disabling random loop speed')
                 settings['randomize_loop_speed'] = False
+        elif n == 'rsd' and looping:
+            n = input(f'Enter time in seconds to delay (press Enter for {settings["loop_speed_delay"]}): ')
+            try:
+                print(f'Randomizing speed after {n} second delay')
+                settings['randomize_loop_speed'] = False
+                delay_speed_thread = threading.Thread(target=delay_speed, args=(int(n),))
+                delay_speed_thread.start()
+            except ValueError:
+                print('\n')
+                print('Numbers only')
         elif n == 'rr' and looping:
             if not settings['randomize_loop_range']:
                 print(f'Enabling random_range')
