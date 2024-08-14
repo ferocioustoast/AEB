@@ -63,7 +63,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
 ![screenshot](https://raw.githubusercontent.com/ferocioustoast/AEB/master/imgs/control_menu.PNG)
 
 - a  : Multiply the sinewave by the entered number.
-- f  : Edit the frequency _(in hertz)_ of the sinewave.
+- f  : Edit the frequencies _(in hertz)_ of the sinewave.
 - mi : Change the left/right or both channels minimum volumes; they must be in between 0.0 and 1.0.
 - ma : Change the left/right or both channels maximum volumes; they must be in between 0.0 and 1.0.
 - r  : Edit or see ramp-up settings

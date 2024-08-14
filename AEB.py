@@ -30,7 +30,7 @@ except Exception:
 config_file = 'config.yaml'
 
 settings = {
-    'sinewave_freq': 987,  # Hz, frequency to play sinewave at
+    'sinewave_freqs': [987],  # Hz, frequency to play sinewave at
 
     # Volume can be set between 0.0 and 1.0
     'left_max_vol': 0.8,
@@ -88,6 +88,8 @@ looping = False  # whether we are looping
 buttons = False  # Press start button four times
 pause = False  # Pause all sounds
 warning = True  # Display warning message on entering control menu
+
+sounds = []  # List for storing sinewave sounds
 
 # Changing half_rum can lead to math problems
 half_rum = 127.5  # Used to switch channels, Calculate steps: 127.5
@@ -252,13 +254,15 @@ def ramp_volume(ramp):
         for i in range(round(settings['ramp_up_steps']) + 1):
             if settings['print_volumes']:
                 print(f'{(i / settings["ramp_up_steps"])} / 1.0')
-            mixer.Sound.set_volume(sound, (i / settings['ramp_up_steps']))
+            for sound in sounds:
+                mixer.Sound.set_volume(sound, (i / settings['ramp_up_steps']))
             time.sleep(settings['ramp_up_time'] / settings['ramp_up_steps'])
     elif ramp == 'down':
         for i in reversed(range(round(settings['ramp_down_steps']) + 1)):
             if settings['print_volumes']:
                 print(f'{(i / settings["ramp_down_steps"])} / 1.0')
-            mixer.Sound.set_volume(sound, (i / settings['ramp_down_steps']))
+            for sound in sounds:
+                mixer.Sound.set_volume(sound, (i / settings['ramp_down_steps']))
             time.sleep(settings['ramp_down_time'] / settings['ramp_down_steps'])
 
 
@@ -284,21 +288,25 @@ def volume_from_motor(motor):
         if not settings['always_set_volume']:
             pass
         else:
-            mixer.Channel(0).set_volume(0.0, 0.0)
+            for i in range(0, len(sounds)):
+                mixer.Channel(i).set_volume(0.0, 0.0)
         return
 
     if settings['ramp_down_enabled'] and not settings['ramp_up_enabled']:
-        mixer.Sound.set_volume(sound, 1.0)
+        for sound in sounds:
+            mixer.Sound.set_volume(sound, 1.0)
 
     lvol = find_l_vol(motor, settings['left_min_vol'], settings['left_max_vol'])
     rvol = find_r_vol(motor, settings['right_min_vol'], settings['right_max_vol'])
 
     if settings['ramp_up_enabled'] and last_zero and time.time() - zero_time >= settings['idle_time_before_ramp_up']:
         volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
-        mixer.Sound.set_volume(sound, 0.0)
+        for sound in sounds:
+            mixer.Sound.set_volume(sound, 0.0)
         volume_ramp_up_thread.start()
 
-    mixer.Channel(0).set_volume(lvol, rvol)
+    for i in range(0, len(sounds)):
+        mixer.Channel(i).set_volume(lvol, rvol)
     last_zero = False
 
     if settings['ramp_down_enabled']:
@@ -339,7 +347,8 @@ def loop_motor():
 
     if settings['ramp_up_enabled']:
         volume_ramp_up_thread = threading.Thread(target=ramp_volume, args=('up',))
-        mixer.Sound.set_volume(sound, 0.0)
+        for sound in sounds:
+            mixer.Sound.set_volume(sound, 0.0)
         volume_ramp_up_thread.start()
 
     while not loop.is_set():
@@ -481,7 +490,7 @@ def print_controls():
         print('BE CAREFUL CHANGING THESE WHILE HOOKED UP!\n')
 
     print(f"a : Edit amplification (current: {settings['amplitude']})")
-    print(f"f : Edit frequency (current: {settings['sinewave_freq']})")
+    print(f"f : Edit frequency (current: {settings['sinewave_freqs']})")
     print(f"mi: Edit left (current: {settings['left_min_vol']}) and/or right (current: {settings['right_min_vol']}) minimum volume")
     print(f"ma: Edit left (current: {settings['left_max_vol']}) and/or right (current: {settings['right_max_vol']}) maximum volume")
 
@@ -522,15 +531,20 @@ Do you have any active audio devices?')
     load_config()
     print('\n')
 
-    mixer.set_num_channels(1)
-    sound = mixer.Sound(generate_sinewave(settings['sinewave_freq'], sample_rate, settings['amplitude']))
+    for wave in settings['sinewave_freqs']:
+        sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
+        sounds.append(sound)
+
     select_device()
+    mixer.set_num_channels(len(sounds))
     if settings['launch_programs_on_select']:
         open_programs(settings['program_list'])
 
     # set volume to zero, play sound
-    mixer.Channel(0).set_volume(0.0, 0.0)
-    sound.play(-1)
+    for i in range(0, len(sounds)):
+        mixer.Channel(i).set_volume(0.0, 0.0)
+    for sound in sounds:
+        sound.play(-1)
 
     # start 360 controller, set rumble callback
     if controller_available:
@@ -589,14 +603,25 @@ Do you have any active audio devices?')
                 n = input("\n")
                 if n == 'f':
                     try:
-                        print(f'Current frequency: {settings["sinewave_freq"]}')
-                        n = input("Enter desired frequency: ")
-                        print(f'Setting frequency to {n}...')
+                        print(f'\n***Multiple frequencies may cause painful clipping***')
+                        print(f'***Lowering amplification or max volume may help***')
+                        print(f'\nCurrent frequencies: {settings["sinewave_freqs"]}')
+                        n = input("Enter desired frequencies (space seperated): ")
+                        if not n.strip().replace(" ", "").isdigit():
+                            print('\nNumbers only (separated by spaces)')
+                            continue
+                        print(f'Setting frequencies to {n}...')
                         mixer.stop()
-                        settings['sinewave_freq'] = int(n)
-                        sound = mixer.Sound(generate_sinewave(settings['sinewave_freq'], sample_rate, settings['amplitude']))
-                        mixer.Channel(0).set_volume(0.0, 0.0)
-                        sound.play(-1)
+                        frequencies = [int(freq) for freq in n.split()]
+                        settings['sinewave_freqs'] = frequencies
+                        sounds = []
+                        for wave in settings['sinewave_freqs']:
+                            sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
+                            sounds.append(sound)
+                        for i in range(0, len(sounds)):
+                            mixer.Channel(i).set_volume(0.0, 0.0)
+                        for sound in sounds:
+                            sound.play(-1)
                     except ValueError:
                         print('\n')
                         print('Numbers only')
@@ -607,9 +632,14 @@ Do you have any active audio devices?')
                         print(f'Setting amplitude to {n}...')
                         mixer.stop()
                         settings['amplitude'] = float(n)
-                        sound = mixer.Sound(generate_sinewave(settings['sinewave_freq'], sample_rate, settings['amplitude']))
-                        mixer.Channel(0).set_volume(0.0, 0.0)
-                        sound.play(-1)
+                        sounds = []
+                        for wave in settings['sinewave_freqs']:
+                            sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
+                            sounds.append(sound)
+                        for i in range(0, len(sounds)):
+                            mixer.Channel(i).set_volume(0.0, 0.0)
+                        for sound in sounds:
+                            sound.play(-1)
                     except ValueError:
                         print('\n')
                         print('Numbers only')
