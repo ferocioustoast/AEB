@@ -618,6 +618,7 @@ Do you have any active audio devices?')
                         for wave in settings['sinewave_freqs']:
                             sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
                             sounds.append(sound)
+                        mixer.set_num_channels(len(sounds))
                         for i in range(0, len(sounds)):
                             mixer.Channel(i).set_volume(0.0, 0.0)
                         for sound in sounds:
@@ -636,6 +637,7 @@ Do you have any active audio devices?')
                         for wave in settings['sinewave_freqs']:
                             sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
                             sounds.append(sound)
+                        mixer.set_num_channels(len(sounds))
                         for i in range(0, len(sounds)):
                             mixer.Channel(i).set_volume(0.0, 0.0)
                         for sound in sounds:
