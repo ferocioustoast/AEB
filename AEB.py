@@ -306,7 +306,10 @@ def volume_from_motor(motor):
         volume_ramp_up_thread.start()
 
     for i in range(0, len(sounds)):
-        mixer.Channel(i).set_volume(lvol, rvol)
+        try:
+            mixer.Channel(i).set_volume(lvol, rvol)
+        except IndexError:
+            pass
     last_zero = False
 
     if settings['ramp_down_enabled']:
