@@ -424,6 +424,20 @@ def loop_motor():
     print("Ending Loop...")
 
 
+def reload_mixer():
+    global sounds
+    mixer.stop()
+    sounds = []
+    for wave in settings['sinewave_freqs']:
+        sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
+        sounds.append(sound)
+    mixer.set_num_channels(len(sounds))
+    for i in range(0, len(sounds)):
+        mixer.Channel(i).set_volume(0.0, 0.0)
+    for sound in sounds:
+        sound.play(-1)
+
+
 def print_help():
     print('\n')
     if not controller_available:
@@ -531,20 +545,11 @@ Do you have any active audio devices?')
     load_config()
     print('\n')
 
-    for wave in settings['sinewave_freqs']:
-        sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
-        sounds.append(sound)
-
     select_device()
-    mixer.set_num_channels(len(sounds))
     if settings['launch_programs_on_select']:
         open_programs(settings['program_list'])
 
-    # set volume to zero, play sound
-    for i in range(0, len(sounds)):
-        mixer.Channel(i).set_volume(0.0, 0.0)
-    for sound in sounds:
-        sound.play(-1)
+    reload_mixer()
 
     # start 360 controller, set rumble callback
     if controller_available:
@@ -611,18 +616,9 @@ Do you have any active audio devices?')
                             print('\nNumbers only (separated by spaces)')
                             continue
                         print(f'Setting frequencies to {n}...')
-                        mixer.stop()
                         frequencies = [int(freq) for freq in n.split()]
                         settings['sinewave_freqs'] = frequencies
-                        sounds = []
-                        for wave in settings['sinewave_freqs']:
-                            sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
-                            sounds.append(sound)
-                        mixer.set_num_channels(len(sounds))
-                        for i in range(0, len(sounds)):
-                            mixer.Channel(i).set_volume(0.0, 0.0)
-                        for sound in sounds:
-                            sound.play(-1)
+                        reload_mixer()
                     except ValueError:
                         print('\n')
                         print('Numbers only')
@@ -631,17 +627,9 @@ Do you have any active audio devices?')
                         print(f'Current amplitude: {settings["amplitude"]}')
                         n = input("Enter desired amplitude: ")
                         print(f'Setting amplitude to {n}...')
-                        mixer.stop()
                         settings['amplitude'] = float(n)
                         sounds = []
-                        for wave in settings['sinewave_freqs']:
-                            sound = mixer.Sound(generate_sinewave(wave, sample_rate, settings['amplitude']))
-                            sounds.append(sound)
-                        mixer.set_num_channels(len(sounds))
-                        for i in range(0, len(sounds)):
-                            mixer.Channel(i).set_volume(0.0, 0.0)
-                        for sound in sounds:
-                            sound.play(-1)
+                        reload_mixer()
                     except ValueError:
                         print('\n')
                         print('Numbers only')
