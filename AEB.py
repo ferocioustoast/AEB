@@ -40,6 +40,8 @@ settings = {
 
     'amplitude': 1,  # Multiplier for sinewave
 
+    'port': 12347,  # Port for UDP Tcode server
+
     'ramp_up_enabled': True,  # Enable volume ramp up on inactivity
     'ramp_up_time': 0.3,  # Time in seconds for volume ramp up
     'ramp_up_steps': 20,  # Number of steps in volume ramp up
@@ -84,6 +86,10 @@ settings = {
 }
 
 looping = False  # whether we are looping
+
+server_running = False
+server_thread = None
+stop_event = threading.Event()
 
 buttons = False  # Press start button four times
 pause = False  # Pause all sounds
@@ -448,6 +454,42 @@ def reload_mixer():
         sound.play(-1)
 
 
+def loop_udp_server(port=settings['port']):
+    global server_running, server_thread, stop_event
+
+    if not server_running:
+        server_running = True
+        stop_event.clear()
+        server_thread = threading.Thread(target=start_udp_server, args=(int(port),))
+        server_thread.daemon = True
+        server_thread.start()
+        print(f'UDP server up and listening on localhost:{port}')
+    else:
+        server_running = False
+        stop_event.set()
+        print("UDP server stopped.")
+
+
+def start_udp_server(port):
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_address = ('localhost', port)
+    sock.bind(server_address)
+
+    try:
+        while not stop_event.is_set():
+            data, address = sock.recvfrom(4096)
+            try:
+                motor = float(f"0.{data.decode().split('L0')[-1].split('I')[0]}") * 255
+                volume_from_motor(motor)
+            except (ValueError, IndexError):
+                print(f"Error processing data: {data.decode()}")
+    finally:
+        sock.close()
+        print("Socket closed.")
+
+
 def print_help():
     print('\n')
     if not controller_available:
@@ -495,6 +537,11 @@ def print_help():
             print('t : Start looping (delayed speed)')
         else:
             print('t : Start looping')
+
+    if server_running:
+        print('u : Stop UDP server')
+    else:
+        print('u : Start UDP server')
 
     if pause:
         print('p : Unpause all sounds')
@@ -802,6 +849,8 @@ Do you have any active audio devices?')
             else:
                 loop.set()
                 looping = False
+        elif n == 'u':
+            loop_udp_server()
         elif n == 's' and looping:
             try:
                 print(f'Current loop transition time in seconds: {settings["loop_transition_time"]}')
