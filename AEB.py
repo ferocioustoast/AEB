@@ -30,7 +30,7 @@ except Exception:
 config_file = 'config.yaml'
 
 settings = {
-    'sinewave_freqs': [987],  # Hz, frequency to play sinewave at
+    'sinewave_freqs': [987],  # Hz, frequencies to play sinewave at
 
     # Volume can be set between 0.0 and 1.0
     'left_max_vol': 0.8,
@@ -205,14 +205,21 @@ def find_r_vol(motor, rminvol, rmaxvol):
 
 def generate_sinewave(frequency, sample_rate, amp):
     sinewave = np.sin(2 * np.pi * np.arange(sample_rate)
-                      * float(frequency) / sample_rate).astype(np.float32) * amp
-    return sinewave
+                      * float(frequency) / sample_rate).astype(np.float32)
+    return sinewave * amp
 
 
 def generate_squarewave(frequency, sample_rate, amp):
-    squarewave = np.sign(np.sin(2 * np.pi * np.arange(sample_rate)
-                                * float(frequency) / sample_rate)) * amp
-    return squarewave
+    t = np.arange(sample_rate) / sample_rate
+    wave = np.where(np.sin(2 * np.pi * frequency * t) >= 0, amp, -amp)
+    return wave.astype(np.float32)
+
+
+def generate_sawtooth(frequency, sample_rate, amp):
+    t = np.arange(sample_rate) / sample_rate
+    sawtooth = (t * frequency) % 1
+    sawtooth = (sawtooth - 0.5) * 2 * amp
+    return sawtooth.astype(np.float32)
 
 
 def select_device():
