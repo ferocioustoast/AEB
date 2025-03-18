@@ -40,7 +40,7 @@ settings = {
 
     'amplitude': 1,  # Multiplier for sinewave
 
-    'port': 12347,  # Port for UDP Tcode server
+    'udp_port': 8000,  # Port for UDP Tcode server
 
     'ramp_up_enabled': True,  # Enable volume ramp up on inactivity
     'ramp_up_time': 0.3,  # Time in seconds for volume ramp up
@@ -454,20 +454,23 @@ def reload_mixer():
         sound.play(-1)
 
 
-def loop_udp_server(port=settings['port']):
+def loop_udp_server(port):
     global server_running, server_thread, stop_event
 
     if not server_running:
-        server_running = True
         stop_event.clear()
         server_thread = threading.Thread(target=start_udp_server, args=(int(port),))
         server_thread.daemon = True
         server_thread.start()
         print(f'UDP server up and listening on localhost:{port}')
+        server_running = True
     else:
-        server_running = False
         stop_event.set()
+        import socket
+        dummy_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        dummy_sock.sendto(b"stop", ('localhost', int(settings['udp_port'])))
         print("UDP server stopped.")
+        server_running = False
 
 
 def start_udp_server(port):
@@ -484,9 +487,13 @@ def start_udp_server(port):
                 motor = float(f"0.{data.decode().split('L0')[-1].split('I')[0]}") * 255
                 volume_from_motor(motor)
             except (ValueError, IndexError):
-                print(f"Error processing data: {data.decode()}")
+                pass
+            except socket.timeout:
+                # Timeout occurred, check stop_event again
+                pass
     finally:
         sock.close()
+        # time.sleep(10)
         print("Socket closed.")
 
 
@@ -850,7 +857,14 @@ Do you have any active audio devices?')
                 loop.set()
                 looping = False
         elif n == 'u':
-            loop_udp_server()
+            if not server_running:
+                n = input(f"Enter the UDP port to use (or press Enter to use '{settings['udp_port']}'): ")
+                if n == '':
+                    n = settings['udp_port']
+                loop_udp_server(n)
+                settings['udp_port'] = n
+            else:
+                loop_udp_server(n)
         elif n == 's' and looping:
             try:
                 print(f'Current loop transition time in seconds: {settings["loop_transition_time"]}')
