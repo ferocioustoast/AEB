@@ -54,7 +54,7 @@ _Assuming you already have [Python](https://www.python.org/downloads/) installed
   -  s  : Change the amount of time, _in seconds,_ to take per loop.
   -  ma : Change the maximum motor number of the loop. _highest is 255_
   -  mi : Change the minimum motor number of the loop. _lowest is 0_
-- u  : Start/Stop UDP server on custom port.
+- u  : Start/Stop UDP server on custom port, listening for Tcode(L0).
 - l  : Opens any programs manually added to the list in the config file.
 - c  : Enters the control menu _(see control menu hotkeys below)_.
 - q  : Closes the program
