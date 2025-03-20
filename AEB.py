@@ -199,7 +199,7 @@ def find_r_vol(motor, rminvol, rmaxvol):
             rvol = rminvol
         else:
             rvol = rminvol + (rmaxvol - rminvol) * (motor - half_rum) / half_rum
-    if settings['extend_lvol']:
+    elif settings['extend_lvol']:
         rvol = rmaxvol + (rminvol - rmaxvol) * (motor - half_rum) / half_rum
     else:
         rvol = rminvol + (rmaxvol - rminvol) * motor / 255
