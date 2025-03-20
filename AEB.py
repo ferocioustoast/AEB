@@ -109,6 +109,7 @@ zero_time = 0  # Time when hit zero
 last_zero = True  # Last motor at zero
 old_motor = 0  # Motor for checking ramp_down
 ramp_start = 0  # Time for triggering ramp_down
+last_motor = -1
 
 
 def create_config_file():
@@ -293,6 +294,10 @@ def volume_from_motor(motor):
     global last_zero
     global old_motor
     global ramp_start
+    global last_motor
+
+    if motor == last_motor:
+        return  # Skip if motor has not changed
 
     if not check_rumble(motor):
         if settings['ramp_up_enabled']:
@@ -330,6 +335,8 @@ def volume_from_motor(motor):
         ramp_start = time.time()
         ramp_check_timer = threading.Timer(settings['idle_time_before_ramp_down'], ramp_check, args=(motor,))
         ramp_check_timer.start()
+
+    last_motor = motor
 
 
 def rumble(client, target, large_motor, small_motor, led_number, user_data):
