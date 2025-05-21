@@ -1,3 +1,5 @@
-vgamepad
 pygame
 numpy
+websockets
+PyYAML
+vgamepad

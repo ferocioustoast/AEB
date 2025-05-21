@@ -2,7 +2,10 @@ import pygame._sdl2.audio as sdl2_audio
 from pygame import mixer
 import numpy as np
 import threading
+import websockets
 import platform
+import asyncio
+import json
 import time
 import yaml
 import os
@@ -41,6 +44,7 @@ settings = {
     'amplitude': 1,  # Multiplier for sinewave
 
     'udp_port': 8000,  # Port for UDP Tcode server
+    'wsdm_port': 54817,  # Port for WSDM Tcode server
 
     'ramp_up_enabled': True,  # Enable volume ramp up on inactivity
     'ramp_up_time': 0.3,  # Time in seconds for volume ramp up
@@ -111,6 +115,63 @@ old_motor = 0  # Motor for checking ramp_down
 ramp_start = 0  # Time for triggering ramp_down
 last_motor = -1
 
+wsdm_enabled = False
+wsdm_thread = None
+
+
+async def wsdm_loop():
+    global wsdm_enabled
+    try:
+        async with websockets.connect(f"ws://localhost:{int(settings['wsdm_port'])}") as websocket:
+            handshake = json.dumps({
+                "identifier": "AEB",
+                "address": "br1d63",
+                "version": 0
+            })
+
+            await websocket.send(handshake)
+            print(f"Connected to WSDM server ws://localhost:{settings['wsdm_port']} as: {handshake}")
+
+            while wsdm_enabled:
+                try:
+                    response = await websocket.recv(4096)
+                    motor = float(f"0.{response.split('L0')[-1].split('I')[0]}") * 255
+                    if motor < 1:
+                        motor = 1  # "Fix" for device turning off at 0
+                    volume_from_motor(motor)
+
+                except Exception as e:
+                    if wsdm_enabled:
+                        print(f"Error receiving WSDM message: {e}")
+                    break
+    except Exception as e:
+        if wsdm_enabled:
+            print(f"Error connecting to WSDM server ws://localhost:{settings['wsdm_port']}: {e}")
+    finally:
+        if wsdm_enabled:
+            print("WSDM loop exited unexpectedly, disabling WSDM.")
+            wsdm_enabled = False
+        else:
+            print("WSDM loop stopped.")
+
+
+def toggle_wsdm():
+    global wsdm_enabled, wsdm_thread, controller_available
+
+    if not wsdm_enabled:
+        wsdm_enabled = True
+        if controller_available:
+            print("Controller input is now paused due to WSDM activation.")
+        print(f"Starting Tcode websocket device on port {settings['wsdm_port']}...")
+        wsdm_thread = threading.Thread(target=asyncio.run, args=(wsdm_loop(),))
+        wsdm_thread.daemon = True
+        wsdm_thread.start()
+    else:
+        wsdm_enabled = False
+        print("Stopping Tcode websocket device...")
+        if controller_available:
+            print("Controller input is now active due to WSDM deactivation.")
+
 
 def create_config_file():
     with open(config_file, 'w') as f:
@@ -119,24 +180,34 @@ def create_config_file():
 
 def load_config():
     global settings
-    default_settings = settings
+    default_settings = settings.copy()
     try:
         with open(config_file, 'r') as f:
-            settings = yaml.safe_load(f)
-        if not settings:
-            # Has config file but it's empty
+            loaded_settings = yaml.safe_load(f)
+        if not loaded_settings:  # Has config file but it's empty
             settings = {}
-        for _ in default_settings:
-            if _ not in settings:
-                print(f'Added new variable "{_}" to {config_file}')
-                update_config(_, default_settings[_])
-        for _ in dict(settings):
-            if _ not in default_settings:
-                settings.pop(_)
-                print(f'Removed unused variable "{_}" from {config_file}')
-                create_config_file()
+        else:
+            settings = loaded_settings
+
+        for key, value in default_settings.items():
+            if key not in settings:
+                print(f'Added new variable "{key}" with value "{value}" to config structure.')
+                settings[key] = value
+
+        keys_to_remove = [key for key in settings if key not in default_settings]
+        if keys_to_remove:
+            for key in keys_to_remove:
+                settings.pop(key)
+                print(f'Removed unused variable "{key}" from {config_file}')
+            create_config_file()
+
     except FileNotFoundError:
-        print(f'Config file not found, creating new {config_file}.')
+        print(f'Config file not found, creating new {config_file} with default settings.')
+        settings = default_settings
+        create_config_file()
+    except yaml.YAMLError:
+        print(f'Error parsing {config_file}. Using default settings and creating a new config file.')
+        settings = default_settings
         create_config_file()
 
 
@@ -344,6 +415,10 @@ def rumble(client, target, large_motor, small_motor, led_number, user_data):
     Callback function triggered at each received state change
     :param small_motor: integer in [0, 255]
     """
+    if wsdm_enabled:
+        # If WSDM is active, controller input should be ignored
+        return
+
     if settings['print_motor_states']:
         print(f'Small Motor: {small_motor}, Large Motor: {large_motor}')
 
@@ -475,7 +550,13 @@ def loop_udp_server(port):
         stop_event.set()
         import socket
         dummy_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        dummy_sock.sendto(b"stop", ('localhost', int(settings['udp_port'])))
+        try:
+            stop_port = int(settings['udp_port'])
+            dummy_sock.sendto(b"stop", ('localhost', stop_port))
+        except ValueError:
+            print(f"Error: Could not convert configured UDP port '{settings['udp_port']}' to an integer for stopping server.")
+        finally:
+            dummy_sock.close()
         print("UDP server stopped.")
         server_running = False
 
@@ -496,11 +577,9 @@ def start_udp_server(port):
             except (ValueError, IndexError):
                 pass
             except socket.timeout:
-                # Timeout occurred, check stop_event again
                 pass
     finally:
         sock.close()
-        # time.sleep(10)
         print("Socket closed.")
 
 
@@ -556,6 +635,11 @@ def print_help():
         print('u : Stop UDP server')
     else:
         print('u : Start UDP server')
+
+    if wsdm_enabled:
+        print('w : Disable Tcode(L0) websocket device')
+    else:
+        print('w : Enable Tcode(L0) websocket device')
 
     if pause:
         print('p : Unpause all sounds')
@@ -646,8 +730,11 @@ Do you have any active audio devices?')
                 settings['print_motor_states'] = True
                 print('Printing motor states')
         elif n == 'x' and controller_available:
-            print('Pressing start four times...')
-            spam_buttons()
+            if wsdm_enabled:
+                print("Controller input is paused while WSDM is active. Disable WSDM ('w') to use controller.")
+            else:
+                print('Pressing start four times...')
+                spam_buttons()
         elif n == 'h':
             if settings['channel_switch_half_way'] is True:
                 settings['channel_switch_half_way'] = False
@@ -676,95 +763,93 @@ Do you have any active audio devices?')
         elif n == 'c':
             while 1 == 1:
                 print_controls()
-                n = input("\n")
-                if n == 'f':
+                n_control = input("\n")
+                if n_control == 'f':
                     try:
                         print(f'\n***Multiple frequencies may cause painful clipping***')
                         print(f'***Lowering amplification or max volume may help***')
                         print(f'\nCurrent frequencies: {settings["sinewave_freqs"]}')
-                        n = input("Enter desired frequencies (space seperated): ")
-                        if not n.strip().replace(" ", "").isdigit():
+                        freq_input = input("Enter desired frequencies (space seperated): ")
+                        if not freq_input.strip().replace(" ", "").isdigit():
                             print('\nNumbers only (separated by spaces)')
                             continue
-                        print(f'Setting frequencies to {n}...')
-                        frequencies = [int(freq) for freq in n.split()]
+                        print(f'Setting frequencies to {freq_input}...')
+                        frequencies = [int(freq) for freq in freq_input.split()]
                         settings['sinewave_freqs'] = frequencies
                         reload_mixer()
                     except ValueError:
                         print('\n')
                         print('Numbers only')
-                elif n == 'a':
+                elif n_control == 'a':
                     try:
                         print(f'Current amplitude: {settings["amplitude"]}')
-                        n = input("Enter desired amplitude: ")
-                        print(f'Setting amplitude to {n}...')
-                        settings['amplitude'] = float(n)
+                        amp_input = input("Enter desired amplitude: ")
+                        print(f'Setting amplitude to {amp_input}...')
+                        settings['amplitude'] = float(amp_input)
                         sounds = []
                         reload_mixer()
                     except ValueError:
                         print('\n')
                         print('Numbers only')
-                elif n == 'mi':
-                    print('[l]eft [r]ight or [b]oth sides?')
-                    n = input("")
+                elif n_control == 'mi':
+                    side_choice = input('[l]eft [r]ight or [b]oth sides?\n')
                     try:
-                        if n == 'l':
+                        if side_choice == 'l':
                             print(f'Current left minvol: {settings["left_min_vol"]}')
-                            n = input("Enter desired left minvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting left minvol to {n}...')
-                            settings['left_min_vol'] = float(n)
-                        elif n == 'r':
+                            vol_input = input("Enter desired left minvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting left minvol to {vol_input}...')
+                            settings['left_min_vol'] = float(vol_input)
+                        elif side_choice == 'r':
                             print(f'Current right minvol: {settings["right_min_vol"]}')
-                            n = input("Enter desired right minvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting right minvol to {n}...')
-                            settings['right_min_vol'] = float(n)
-                        elif n == 'b':
+                            vol_input = input("Enter desired right minvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting right minvol to {vol_input}...')
+                            settings['right_min_vol'] = float(vol_input)
+                        elif side_choice == 'b':
                             print(f'Current left minvol: {settings["left_min_vol"]}')
                             print(f'Current right minvol: {settings["right_min_vol"]}')
-                            n = input("Enter desired minvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting both minvols to {n}...')
-                            settings['left_min_vol'] = float(n)
-                            settings['right_min_vol'] = float(n)
+                            vol_input = input("Enter desired minvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting both minvols to {vol_input}...')
+                            settings['left_min_vol'] = float(vol_input)
+                            settings['right_min_vol'] = float(vol_input)
                     except ValueError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
                     except AssertionError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
-                elif n == 'ma':
-                    print('[l]eft [r]ight or [b]oth sides?')
-                    n = input("")
+                elif n_control == 'ma':
+                    side_choice = input('[l]eft [r]ight or [b]oth sides?\n')
                     try:
-                        if n == 'l':
+                        if side_choice == 'l':
                             print(f'Current left maxvol: {settings["left_max_vol"]}')
-                            n = input("Enter desired left maxvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting left maxvol to {n}...')
-                            settings['left_max_vol'] = float(n)
-                        elif n == 'r':
+                            vol_input = input("Enter desired left maxvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting left maxvol to {vol_input}...')
+                            settings['left_max_vol'] = float(vol_input)
+                        elif side_choice == 'r':
                             print(f'Current right maxvol: {settings["right_max_vol"]}')
-                            n = input("Enter desired right maxvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting right maxvol to {n}...')
-                            settings['right_max_vol'] = float(n)
-                        elif n == 'b':
+                            vol_input = input("Enter desired right maxvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting right maxvol to {vol_input}...')
+                            settings['right_max_vol'] = float(vol_input)
+                        elif side_choice == 'b':
                             print(f'Current left maxvol: {settings["left_max_vol"]}')
                             print(f'Current right maxvol: {settings["right_max_vol"]}')
-                            n = input("Enter desired maxvol between 0.0 and 1.0: ")
-                            assert float(n) >= 0.0 and float(n) <= 1.0
-                            print(f'Setting both maxvols to {n}...')
-                            settings['left_max_vol'] = float(n)
-                            settings['right_max_vol'] = float(n)
+                            vol_input = input("Enter desired maxvol between 0.0 and 1.0: ")
+                            assert float(vol_input) >= 0.0 and float(vol_input) <= 1.0
+                            print(f'Setting both maxvols to {vol_input}...')
+                            settings['left_max_vol'] = float(vol_input)
+                            settings['right_max_vol'] = float(vol_input)
                     except ValueError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
                     except AssertionError:
                         print('\n')
                         print('Numbers between 0.0 and 1.0 only')
-                elif n == 'p':
+                elif n_control == 'p':
                     if pause is False:
                         print('Pausing sound')
                         pause = True
@@ -773,55 +858,52 @@ Do you have any active audio devices?')
                         print('Resuming sound')
                         pause = False
                         mixer.unpause()
-                elif n == 'r' or n == 'rd':
-                    if n == 'r':
-                        _ = 'up'
-                    else:
-                        _ = 'down'
+                elif n_control == 'r' or n_control == 'rd':
+                    ramp_direction = 'up' if n_control == 'r' else 'down'
                     while 1 == 1:
                         print('\n')
-                        if settings[f'ramp_{_}_enabled']:
-                            print(f'[1] Ramp {_} currently: Enabled')
+                        if settings[f'ramp_{ramp_direction}_enabled']:
+                            print(f'[1] Ramp {ramp_direction} currently: Enabled')
                         else:
-                            print(f'[1] Ramp {_} currently: Disabled')
-                        print(f'[2] Ramp {_} time: {settings[f"ramp_{_}_time"]} seconds')
-                        print(f'[3] Ramp {_} steps: {settings[f"ramp_{_}_steps"]}')
-                        print(f'[4] Idle time before ramp {_}: {settings[f"idle_time_before_ramp_{_}"]} seconds')
-                        n = input("\nEnter the number matching the option you wish to change (or press enter to leave): ")
-                        if n == '1':
-                            if settings[f'ramp_{_}_enabled']:
-                                print(f'Disabling ramp {_}')
-                                settings[f'ramp_{_}_enabled'] = False
+                            print(f'[1] Ramp {ramp_direction} currently: Disabled')
+                        print(f'[2] Ramp {ramp_direction} time: {settings[f"ramp_{ramp_direction}_time"]} seconds')
+                        print(f'[3] Ramp {ramp_direction} steps: {settings[f"ramp_{ramp_direction}_steps"]}')
+                        print(f'[4] Idle time before ramp {ramp_direction}: {settings[f"idle_time_before_ramp_{ramp_direction}"]} seconds')
+                        ramp_edit_choice = input("\nEnter the number matching the option you wish to change (or press enter to leave): ")
+                        if ramp_edit_choice == '1':
+                            if settings[f'ramp_{ramp_direction}_enabled']:
+                                print(f'Disabling ramp {ramp_direction}')
+                                settings[f'ramp_{ramp_direction}_enabled'] = False
                             else:
-                                print(f'Enabling ramp {_}')
-                                settings[f'ramp_{_}_enabled'] = True
-                        elif n == '2':
-                            n = input(f"Enter new ramp {_} time in seconds: ")
+                                print(f'Enabling ramp {ramp_direction}')
+                                settings[f'ramp_{ramp_direction}_enabled'] = True
+                        elif ramp_edit_choice == '2':
+                            time_input = input(f"Enter new ramp {ramp_direction} time in seconds: ")
                             try:
-                                settings[f'ramp_{_}_time'] = float(n)
-                                print(f'Setting ramp {_} time to: {float(n)} seconds')
+                                settings[f'ramp_{ramp_direction}_time'] = float(time_input)
+                                print(f'Setting ramp {ramp_direction} time to: {float(time_input)} seconds')
                             except ValueError:
                                 print('\n')
                                 print('Numbers only')
-                        elif n == '3':
-                            n = input(f"Enter new number of ramp {_} steps: ")
+                        elif ramp_edit_choice == '3':
+                            steps_input = input(f"Enter new number of ramp {ramp_direction} steps: ")
                             try:
-                                settings[f'ramp_{_}_steps'] = float(n)
-                                print(f'Setting ramp {_} steps to: {float(n)}')
+                                settings[f'ramp_{ramp_direction}_steps'] = float(steps_input)
+                                print(f'Setting ramp {ramp_direction} steps to: {float(steps_input)}')
                             except ValueError:
                                 print('\n')
                                 print('Numbers only')
-                        elif n == '4':
-                            n = input("Enter new idle time in seconds: ")
+                        elif ramp_edit_choice == '4':
+                            idle_input = input("Enter new idle time in seconds: ")
                             try:
-                                settings[f'idle_time_before_ramp_{_}'] = float(n)
-                                print(f'Setting idle time to: {float(n)} seconds')
+                                settings[f'idle_time_before_ramp_{ramp_direction}'] = float(idle_input)
+                                print(f'Setting idle time to: {float(idle_input)} seconds')
                             except ValueError:
                                 print('\n')
                                 print('Numbers only')
                         else:
                             break
-                if n == 'l':
+                if n_control == 'l':
                     configs = []
                     for file in os.listdir(os.getcwd()):
                         if file.endswith('.yaml'):
@@ -829,30 +911,28 @@ Do you have any active audio devices?')
                     print('\n')
                     print(f'yaml files found: {configs}')
                     print('\n')
-                    n = input(f"Enter name of the yaml config to load (or press Enter to use '{config_file}'): ")
-                    if n == '':
-                        n = config_file
-                    if n.endswith('.yaml'):
-                        config_file = n
-                    else:
-                        config_file = n + '.yaml'
+                    config_name_input = input(f"Enter name of the yaml config to load (or press Enter to use '{config_file}'): ")
+                    if config_name_input == '':
+                        config_name_input = config_file
+                    if not config_name_input.endswith('.yaml'):
+                        config_name_input += '.yaml'
+                    config_file = config_name_input
                     print(f'\nLoading {config_file}...')
                     load_config()
-                if n == 's':
-                    n = input(f"Enter name of the yaml config to update (or press Enter to use '{config_file}'): ")
-                    if n.endswith('.yaml'):
-                        pass
-                    elif n == config_file:
-                        pass
-                    elif n == '':
-                        n = config_file
-                    else:
-                        n = n + '.yaml'
-                    config_file = n
+                    reload_mixer()
+                if n_control == 's':
+                    save_config_name_input = input(f"Enter name of the yaml config to update (or press Enter to use '{config_file}'): ")
+                    if save_config_name_input == '':
+                        save_config_name_input = config_file
+                    if not save_config_name_input.endswith('.yaml'):
+                        save_config_name_input += '.yaml'
+
+                    config_file = save_config_name_input
                     print(f'\nUpdating {config_file} with the current settings...')
-                    for _ in settings:
-                        update_config(_, settings[_])
-                elif n == 'c':
+                    create_config_file()
+                    print(f'{config_file} updated.')
+
+                elif n_control == 'c':
                     break
         elif n == 't':
             if not looping:
@@ -865,29 +945,40 @@ Do you have any active audio devices?')
                 looping = False
         elif n == 'u':
             if not server_running:
-                n = input(f"Enter the UDP port to use (or press Enter to use '{settings['udp_port']}'): ")
-                if n == '':
-                    n = settings['udp_port']
-                loop_udp_server(n)
-                settings['udp_port'] = n
+                udp_port_input = input(f"Enter the UDP port to use (or press Enter to use '{settings['udp_port']}'): ")
+                chosen_udp_port = settings['udp_port']
+                if udp_port_input == '':
+                    pass
+                else:
+                    try:
+                        port_val = int(udp_port_input)
+                        if 0 < port_val < 65536:
+                            chosen_udp_port = udp_port_input
+                        else:
+                            print(f"Invalid port number (must be 1-65535). Using current port: {settings['udp_port']}.")
+                    except ValueError:
+                        print(f"Invalid input. Using current port: {settings['udp_port']}.")
+
+                settings['udp_port'] = chosen_udp_port
+                loop_udp_server(chosen_udp_port)
             else:
-                loop_udp_server(n)
+                loop_udp_server(settings['udp_port'])
         elif n == 's' and looping:
             try:
                 print(f'Current loop transition time in seconds: {settings["loop_transition_time"]}')
-                n = input("Enter desired loop transition time: ")
-                print(f'Setting loop transition time to {n}...')
-                settings['loop_transition_time'] = float(n)
+                loop_time_input = input("Enter desired loop transition time: ")
+                print(f'Setting loop transition time to {loop_time_input}...')
+                settings['loop_transition_time'] = float(loop_time_input)
             except ValueError:
                 print('\n')
                 print('Numbers only')
         elif n == 'ma' and looping:
             try:
                 print(f'Current max loop: {settings["max_loop"]}')
-                n = input("Enter desired max loop between 1 and 255: ")
-                assert int(n) >= 1 and int(n) <= 255
-                print(f'Setting max loop to {n}...')
-                settings['max_loop'] = int(n)
+                max_loop_input = input("Enter desired max loop between 1 and 255: ")
+                assert int(max_loop_input) >= 1 and int(max_loop_input) <= 255
+                print(f'Setting max loop to {max_loop_input}...')
+                settings['max_loop'] = int(max_loop_input)
             except ValueError:
                 print('\n')
                 print('Numbers only')
@@ -897,10 +988,10 @@ Do you have any active audio devices?')
         elif n == 'mi' and looping:
             try:
                 print(f'Current min loop: {settings["min_loop"]}')
-                n = input("Enter desired min loop between 0 and 254: ")
-                assert int(n) >= 0 and int(n) <= 254
-                print(f'Setting min loop to {n}...')
-                settings['min_loop'] = int(n)
+                min_loop_input = input("Enter desired min loop between 0 and 254: ")
+                assert int(min_loop_input) >= 0 and int(min_loop_input) <= 254
+                print(f'Setting min loop to {min_loop_input}...')
+                settings['min_loop'] = int(min_loop_input)
             except ValueError:
                 print('\n')
                 print('Numbers only')
@@ -915,11 +1006,15 @@ Do you have any active audio devices?')
                 print(f'Disabling random loop speed')
                 settings['randomize_loop_speed'] = False
         elif n == 'rsd' and looping:
-            n = input(f'Enter time in seconds to delay (press Enter for {settings["loop_speed_delay"]}): ')
+            delay_input = input(f'Enter time in seconds to delay (press Enter for {settings["loop_speed_delay"]}): ')
             try:
-                print(f'Randomizing speed after {n} second delay')
+                delay_seconds = settings["loop_speed_delay"]
+                if delay_input:
+                    delay_seconds = int(delay_input)
+
+                print(f'Randomizing speed after {delay_seconds} second delay')
                 settings['randomize_loop_speed'] = False
-                delay_speed_thread = threading.Thread(target=delay_speed, args=(int(n),))
+                delay_speed_thread = threading.Thread(target=delay_speed, args=(delay_seconds,))
                 delay_speed_thread.start()
             except ValueError:
                 print('\n')
@@ -931,7 +1026,44 @@ Do you have any active audio devices?')
             else:
                 print(f'Disabling random_range')
                 settings['randomize_loop_range'] = False
+        elif n == 'w':
+            if not wsdm_enabled:
+                wsdm_port_input = input(f"Enter the WSDM port to use (or press Enter to use '{settings['wsdm_port']}'): ")
+                chosen_wsdm_port = settings['wsdm_port']
+                if wsdm_port_input == '':
+                    pass
+                else:
+                    try:
+                        port_val = int(wsdm_port_input)
+                        if 0 < port_val < 65536:
+                            chosen_wsdm_port = wsdm_port_input
+                        else:
+                            print(f"Invalid port number (must be 1-65535). Using current port: {settings['wsdm_port']}.")
+                    except ValueError:
+                        print(f"Invalid input. Using current port: {settings['wsdm_port']}.")
+                
+                settings['wsdm_port'] = chosen_wsdm_port
+                toggle_wsdm()
+            else:
+                toggle_wsdm()
         elif n == 'q':
             print('Quitting...')
+            if wsdm_enabled:  # Gracefully stop wsdm if enabled
+                wsdm_enabled = False
+                if wsdm_thread and wsdm_thread.is_alive():
+                    wsdm_thread.join(timeout=1)
+            if server_running:  # Gracefully stop udp server if enabled
+                stop_event.set()
+                import socket
+                dummy_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                try:
+                    dummy_sock.sendto(b"stop", ('localhost', int(settings['udp_port'])))
+                except ValueError:
+                    pass
+                finally:
+                    dummy_sock.close()
+                if server_thread and server_thread.is_alive():
+                    server_thread.join(timeout=1)
+
             mixer.quit()
             break
