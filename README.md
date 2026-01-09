@@ -121,7 +121,7 @@ Settings are saved automatically. The system uses two types of configuration fil
 
 ## 🤖 Advanced Usage & AI Scene Generation
 
-For power users and developers, a comprehensive **Technical Specification** document is available on the [wiki]([https://github.com/ferocioustoast/AEB/wiki](https://github.com/ferocioustoast/AEB/wiki/Technical-Specifications)). This document details the entire `.json` file structure and is the definitive guide for manual editing or for providing context to an AI assistant (like ChatGPT, Claude, or Gemini) to generate new, creative scenes for you.
+For power users and developers, a comprehensive **Technical Specification** document is available on the [wiki](https://github.com/ferocioustoast/AEB/wiki/Technical-Specifications). This document details the entire `.json` file structure and is the definitive guide for manual editing or for providing context to an AI assistant (like ChatGPT, Claude, or Gemini) to generate new, creative scenes for you.
 
 ## 📜 Disclaimer
 
