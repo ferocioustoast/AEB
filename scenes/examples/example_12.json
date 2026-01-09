@@ -1,0 +1,37 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 12: The Doppler Siren",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates Shear (Directional Drag). Pitch shifts UP during the forward cycle and DOWN during the return cycle, creating a distinct two-tone siren effect distinct from position.",
+        "key_features": [
+            "Internal: Shear",
+            "Directional Pitch Shifting",
+            "Doppler Effect"
+        ]
+    },
+    "loop_motion_type": "sine",
+    "static_loop_time_s": 1.0,
+    "sound_waves": {
+        "left": [ { "type": "sine", "frequency": 500.0, "amplitude": 0.8 } ],
+        "right": [ { "type": "sine", "frequency": 500.0, "amplitude": 0.8 } ],
+        "ambient": []
+    },
+    "internal_tension_limit": 0.1,
+    "internal_tension_release_rate": 0.1,
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: Shear",
+            "target": "left.0.frequency",
+            "amount": 300.0,
+            "mode": "additive"
+        },
+        {
+            "enabled": true,
+            "source": "Internal: Shear",
+            "target": "right.0.frequency",
+            "amount": 300.0,
+            "mode": "additive"
+        }
+    ]
+}

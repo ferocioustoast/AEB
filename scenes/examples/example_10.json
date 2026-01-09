@@ -1,0 +1,33 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 10: Somatic Excitation",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates the 'Thermodynamic' engine. As you move faster, 'System Excitation' builds up, introducing a wobble LFO. When you stop, the effect lingers before cooling down.",
+        "key_features": [
+            "Internal: System Excitation",
+            "Dynamic LFO Depth",
+            "Thermodynamic Cooldown Hold"
+        ]
+    },
+    "sound_waves": {
+        "left": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_depth": 0.0 } ],
+        "right": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_depth": 0.0 } ],
+        "ambient": []
+    },
+    "system_lfos": [
+        { "name": "Wobble", "frequency": 6.0, "waveform": "sine" }
+    ],
+    "somatic_excitation_buildup_s": 30.0,
+    "somatic_excitation_decay_s": 10.0,
+    "somatic_excitation_cooldown_s": 5.0,
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: System Excitation",
+            "target": "left.0.lfo_depth",
+            "amount": 0.8,
+            "mode": "set",
+            "comment": "Sets LFO depth based on Excitation level."
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+{
+  "preset_metadata": {
+    "preset_name": "Example 3: Dynamic Speed Response",
+    "author": "AEB Systems Architect",
+    "description": "Demonstrates using an Analytical Motion Source ('Primary Motion: Speed') to make a scene's texture and tone react to the speed of the user's input.",
+    "key_features": [ "Primary Motion Source active", "Speed modulating Frequency & Filter" ]
+  },
+  "sound_waves": {
+    "left": [ { "type": "sawtooth", "frequency": 300.0, "amplitude": 1.0, "filter_enabled": true } ],
+    "right": [ { "type": "sawtooth", "frequency": 300.0, "amplitude": 1.0, "filter_enabled": true } ],
+    "ambient": []
+  },
+  "modulation_matrix": [
+    { "enabled": true, "source": "Primary Motion: Speed", "target": "left.0.frequency", "amount": 800.0, "mode": "additive" },
+    { "enabled": true, "source": "Primary Motion: Speed", "target": "right.0.frequency", "amount": 800.0, "mode": "additive" },
+    { "enabled": true, "source": "Primary Motion: Speed", "target": "left.0.filter_cutoff_frequency", "amount": 4000.0, "mode": "additive" },
+    { "enabled": true, "source": "Primary Motion: Speed", "target": "right.0.filter_cutoff_frequency", "amount": 4000.0, "mode": "additive" }
+  ]
+}

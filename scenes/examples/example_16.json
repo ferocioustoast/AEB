@@ -1,0 +1,50 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 16: The Living Drone",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates 'Internal: Drift'. A Pink Noise drone is modulated by the organic Drift signal. It slowly shifts tone (Filter) and position (Pan), mimicking a living, breathing entity.",
+        "key_features": [
+            "Internal: Drift",
+            "Organic Modulation",
+            "Anti-Habituation"
+        ]
+    },
+    "internal_drift_speed": 0.3,
+    "internal_drift_octaves": 3,
+    "static_loop_time_s": 2.0,
+    "sound_waves": {
+        "left": [],
+        "right": [],
+        "ambient": [
+            {
+                "type": "pink_noise",
+                "frequency": 100.0,
+                "amplitude": 0.6,
+                "pan": -1.0,
+                "filter_enabled": true,
+                "filter_type": "lowpass",
+                "filter_cutoff_frequency": 600.0,
+                "filter_resonance_q": 1.0,
+                "comment": "Base Pan is -1.0 (Left). Drift adds +2.0 to sweep full width."
+            }
+        ]
+    },
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: Drift",
+            "target": "ambient.0.filter_cutoff_frequency",
+            "amount": 1500.0,
+            "mode": "additive",
+            "comment": "Drift opens the filter (breath in)"
+        },
+        {
+            "enabled": true,
+            "source": "Internal: Drift",
+            "target": "ambient.0.pan",
+            "amount": 2.0,
+            "mode": "additive",
+            "comment": "Drift shifts the stereo image from Left (-1.0) to Right (1.0)"
+        }
+    ]
+}

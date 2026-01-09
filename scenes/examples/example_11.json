@@ -1,0 +1,41 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 11: Kinetic Stress",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates 'Kinetic Stress', which detects harsh acceleration. Smooth sine motion is clean. Square wave motion triggers bursts of noise, simulating friction or impact.",
+        "key_features": [
+            "Internal: Kinetic Stress",
+            "Reactive Texture",
+            "Impact Simulation"
+        ]
+    },
+    "sound_waves": {
+        "left": [
+            { "type": "sine", "frequency": 500.0, "amplitude": 0.8 },
+            { "type": "white_noise", "amplitude": 0.0, "comment": "Friction Layer" }
+        ],
+        "right": [
+            { "type": "sine", "frequency": 500.0, "amplitude": 0.8 },
+            { "type": "white_noise", "amplitude": 0.0, "comment": "Friction Layer" }
+        ],
+        "ambient": []
+    },
+    "somatic_stress_attack_s": 0.05,
+    "somatic_stress_release_s": 0.3,
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: Kinetic Stress",
+            "target": "left.1.amplitude",
+            "amount": 1.0,
+            "mode": "additive"
+        },
+        {
+            "enabled": true,
+            "source": "Internal: Kinetic Stress",
+            "target": "right.1.amplitude",
+            "amount": 1.0,
+            "mode": "additive"
+        }
+    ]
+}

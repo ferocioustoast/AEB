@@ -1,0 +1,52 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 8: Pneumatic Compression (Fixed)",
+        "author": "AEB Systems Architect",
+        "description": "Fixed version. Lowered 'motion_speed_floor' to 3.0 so the velocity signal hits full intensity even at moderate speeds. Increased Resonance to make the sweep obvious.",
+        "key_features": [
+            "Primary Motion: Velocity",
+            "High Resonance (Wah-wah)",
+            "Calibrated Sensitivity"
+        ]
+    },
+    "motion_speed_floor": 3.0,
+    "sound_waves": {
+        "left": [
+            {
+                "type": "sawtooth",
+                "frequency": 400.0,
+                "amplitude": 0.8,
+                "filter_enabled": true,
+                "filter_cutoff_frequency": 2000.0,
+                "filter_resonance_q": 4.0
+            }
+        ],
+        "right": [
+            {
+                "type": "sawtooth",
+                "frequency": 400.0,
+                "amplitude": 0.8,
+                "filter_enabled": true,
+                "filter_cutoff_frequency": 2000.0,
+                "filter_resonance_q": 4.0
+            }
+        ],
+        "ambient": []
+    },
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Primary Motion: Velocity",
+            "target": "left.0.filter_cutoff_frequency",
+            "amount": 1500.0,
+            "mode": "additive"
+        },
+        {
+            "enabled": true,
+            "source": "Primary Motion: Velocity",
+            "target": "right.0.filter_cutoff_frequency",
+            "amount": 1500.0,
+            "mode": "additive"
+        }
+    ]
+}

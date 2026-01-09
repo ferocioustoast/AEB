@@ -1,0 +1,61 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 6: The Logic Gate",
+        "author": "AEB Systems Architect",
+        "description": "An unambiguous demonstration of meta-modulation. A hotkey directly controls the 'enabled' state of another rule, turning a rhythmic effect on and off. The Internal Loop MUST be active to hear any sensation.",
+        "key_features": [
+            "Meta-Modulation",
+            "Direct Hotkey Control",
+            "Clean, binary state switching"
+        ]
+    },
+    "sound_waves": {
+        "left": [
+            {
+                "type": "sine",
+                "frequency": 700,
+                "amplitude": 0.8,
+                "comment": "This is the base tone you will always feel."
+            }
+        ],
+        "right": [
+            {
+                "type": "sine",
+                "frequency": 700,
+                "amplitude": 0.8,
+                "comment": "This is the base tone you will always feel."
+            }
+        ],
+        "ambient": []
+    },
+    "hotkeys": [
+        {
+            "name": "Logic Gate",
+            "key_combo": "g"
+        }
+    ],
+    "system_lfos": [
+        {
+            "name": "Rhythm",
+            "frequency": 4.0
+        }
+    ],
+    "modulation_matrix": [
+        {
+            "enabled": false,
+            "source": "System LFO: Rhythm (Unipolar)",
+            "target": "left.0.amplitude",
+            "amount": -0.6,
+            "mode": "multiplicative",
+            "comment": "THE EFFECT. This rule starts disabled. It creates the pulse."
+        },
+        {
+            "enabled": true,
+            "source": "Hotkey: Logic Gate",
+            "target": "modulation_matrix.0.enabled",
+            "amount": 1.0,
+            "mode": "set",
+            "comment": "THE SWITCH. When the hotkey is pressed, this rule enables Rule 1."
+        }
+    ]
+}

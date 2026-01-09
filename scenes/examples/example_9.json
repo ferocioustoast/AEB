@@ -1,0 +1,34 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 9: The Seal",
+        "author": "AEB Systems Architect",
+        "description": "Uses Velocity with 'Clamp Min' to create a one-way effect. A noise layer swells only during the withdrawal path.",
+        "key_features": [
+            "One-Way Texture",
+            "Clamp Min logic"
+        ]
+    },
+    "sound_waves": {
+        "left": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.7 } ],
+        "right": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.7 } ],
+        "ambient": [
+            {
+                "type": "pink_noise",
+                "frequency": 1000.0,
+                "amplitude": 0.0,
+                "comment": "Withdraw Noise (Starts Silent)"
+            }
+        ]
+    },
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Primary Motion: Velocity",
+            "target": "ambient.0.amplitude",
+            "amount": 1.0,
+            "mode": "additive",
+            "clamp_min": 0.0,
+            "comment": "Adds volume only when Velocity is POSITIVE (Withdrawal)"
+        }
+    ]
+}

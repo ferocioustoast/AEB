@@ -1,0 +1,37 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 4: Multi-Stage Intensity Ramp",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates a State Variable as a simple state machine on the Ambient channel. The Internal Loop must be active to hear the audio.",
+        "key_features": [ "State Variables", "Conditional Modulation Rules" ]
+    },
+    "sound_waves": {
+        "left": [], "right": [],
+        "ambient": [
+            { "type": "sine", "frequency": 500, "amplitude": 0.5, "pan": 0.0, "comment": "Base amplitude is 0.5" }
+        ]
+    },
+    "hotkeys": [
+        { "name": "Increase Intensity", "key_combo": "h" },
+        { "name": "Reset Intensity", "key_combo": "r" }
+    ],
+    "system_lfos": [
+        { "name": "Slow Pulse", "frequency": 1.0 },
+        { "name": "Fast Pulse", "frequency": 4.0 }
+    ],
+    "modulation_matrix": [
+        { "enabled": true, "source": "Hotkey: Increase Intensity", "target": "State.Intensity.add", "amount": 0.25, "clamp_max": 1.0 },
+        { "enabled": true, "source": "Hotkey: Reset Intensity", "target": "State.Intensity.set", "amount": 0.0 },
+        {
+            "enabled": true, "source": "System LFO: Slow Pulse (Unipolar)", "target": "ambient.0.amplitude", "amount": 0.4, "mode": "additive",
+            "conditions": [
+                { "source": "State.Intensity", "operator": ">", "threshold": 0.4 },
+                { "source": "State.Intensity", "operator": "<", "threshold": 0.8 }
+            ]
+        },
+        {
+            "enabled": true, "source": "System LFO: Fast Pulse (Unipolar)", "target": "ambient.0.amplitude", "amount": 0.5, "mode": "additive",
+            "conditions": [ { "source": "State.Intensity", "operator": ">", "threshold": 0.8 } ]
+        }
+    ]
+}

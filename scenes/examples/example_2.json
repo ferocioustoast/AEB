@@ -1,0 +1,27 @@
+{
+  "preset_metadata": {
+    "preset_name": "Example 2: Interactive Mode Toggle",
+    "author": "AEB Systems Architect",
+    "description": "Demonstrates a Scene Hotkey on the Ambient channel. The Internal Loop must be active for audio to play.",
+    "key_features": [ "Scene Hotkey control", "Using the Ambient Channel" ]
+  },
+  "sound_waves": {
+    "left": [], "right": [],
+    "ambient": [
+      { "type": "sine", "frequency": 400.0, "amplitude": 0.7, "pan": 0.0 },
+      { "type": "sine", "frequency": 1200.0, "amplitude": 0.6, "pan": 0.0 }
+    ]
+  },
+  "hotkeys": [
+    { "name": "Toggle Effect", "key_combo": "g" }
+  ],
+  "modulation_matrix": [
+    {
+      "enabled": true,
+      "source": "Hotkey: Toggle Effect",
+      "target": "ambient.1.gate",
+      "amount": 1.0,
+      "mode": "additive"
+    }
+  ]
+}

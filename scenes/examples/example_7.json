@@ -1,0 +1,52 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 7: Hybrid Layered Rendering",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates the 'layered' panning law, where a moving wave reveals a stationary zonal wave. This is the core of creating complex, physically-modeled sensations.",
+        "key_features": [
+            "panning_law: layered",
+            "Moving Layer (no spatial_mapping)",
+            "Zonal Layer (spatial_mapping enabled)"
+        ]
+    },
+    "panning_law": "layered",
+    "sound_waves": {
+        "left": [
+            {
+                "type": "sine",
+                "frequency": 600,
+                "amplitude": 0.7,
+                "pan": 0.0,
+                "comment": "ZONAL LAYER ('The Interior'): This smooth wave only appears in the center.",
+                "spatial_mapping": {
+                    "enabled": true,
+                    "left_curve": [
+                        [0.0, 0.0],
+                        [0.2, 0.0],
+                        [0.5, 1.0],
+                        [0.8, 0.0],
+                        [1.0, 0.0]
+                    ],
+                    "right_curve": [
+                        [0.0, 0.0],
+                        [0.2, 0.0],
+                        [0.5, 1.0],
+                        [0.8, 0.0],
+                        [1.0, 0.0]
+                    ]
+                }
+            }
+        ],
+        "right": [
+            {
+                "type": "sawtooth",
+                "frequency": 900,
+                "amplitude": 0.8,
+                "comment": "MOVING LAYER ('The Point'): This sharp wave moves back and forth.",
+                "spatial_mapping": null
+            }
+        ],
+        "ambient": []
+    },
+    "modulation_matrix": []
+}

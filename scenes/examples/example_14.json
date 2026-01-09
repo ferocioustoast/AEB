@@ -1,0 +1,74 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 14: Manual Pneumatics",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates manual handling of the Bipolar V-A0 axis. It maps Negative values (Insertion) to Filter Cutoff for muffling, and Positive values (Withdrawal) to Amplitude for withdraw.",
+        "key_features": [
+            "TCode: V-A0 (Pneumatics)",
+            "Bipolar Signal Splitting",
+            "Physics-driven Sound Design"
+        ]
+    },
+    "sound_waves": {
+        "left": [
+            {
+                "type": "sawtooth",
+                "frequency": 600.0,
+                "amplitude": 0.5,
+                "filter_enabled": true,
+                "filter_cutoff_frequency": 4000.0,
+                "filter_resonance_q": 2.0,
+                "comment": "Textured wave with headroom for boosting."
+            }
+        ],
+        "right": [
+            {
+                "type": "sawtooth",
+                "frequency": 600.0,
+                "amplitude": 0.5,
+                "filter_enabled": true,
+                "filter_cutoff_frequency": 4000.0,
+                "filter_resonance_q": 2.0,
+                "comment": "Textured wave with headroom for boosting."
+            }
+        ],
+        "ambient": []
+    },
+    "vas_va0_smoothing": 0.1,
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "TCode: V-A0",
+            "target": "left.0.filter_cutoff_frequency",
+            "amount": 3000.0,
+            "mode": "additive",
+            "comment": "BIPOLAR: Negative V-A0 subtracts from cutoff (Muffle). Positive adds (Brighten)."
+        },
+        {
+            "enabled": true,
+            "source": "TCode: V-A0",
+            "target": "right.0.filter_cutoff_frequency",
+            "amount": 3000.0,
+            "mode": "additive",
+            "comment": "BIPOLAR: Negative V-A0 subtracts from cutoff (Muffle). Positive adds (Brighten)."
+        },
+        {
+            "enabled": true,
+            "source": "TCode: V-A0",
+            "target": "left.0.amplitude",
+            "amount": 0.5,
+            "mode": "additive",
+            "clamp_min": 0.0,
+            "comment": "UNIPOLAR: Clamp Min 0.0 ensures we only boost volume on Withdrawal (Positive)."
+        },
+        {
+            "enabled": true,
+            "source": "TCode: V-A0",
+            "target": "right.0.amplitude",
+            "amount": 0.5,
+            "mode": "additive",
+            "clamp_min": 0.0,
+            "comment": "UNIPOLAR: Clamp Min 0.0 ensures we only boost volume on Withdrawal (Positive)."
+        }
+    ]
+}

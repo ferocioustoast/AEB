@@ -1,0 +1,52 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 15: Physics Demo (Elasticity & Impact)",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates the Physics Engine. 1. Speed causes the sensation to 'tear' apart (Elasticity). 2. Direction changes trigger a sub-bass thud (Transient Impulse).",
+        "key_features": [
+            "Internal: Transient Impulse",
+            "Dynamic Phase Displacement",
+            "Mass-Spring-Damper Physics"
+        ]
+    },
+    "loop_motion_type": "sine",
+    "static_loop_time_s": 0.8,
+    "impulse_mass": 0.5,
+    "impulse_spring": 80.0,
+    "impulse_damping": 5.0,
+    "sound_waves": {
+        "left": [
+            { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "pan": -1.0 }
+        ],
+        "right": [
+            { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "pan": 1.0 }
+        ],
+        "ambient": [
+            {
+                "type": "sine",
+                "frequency": 100.0,
+                "amplitude": 0.0,
+                "pan": 0.0,
+                "comment": "THE CHASSIS: This low wave only rings on impact."
+            }
+        ]
+    },
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: Transient Impulse",
+            "target": "ambient.0.amplitude",
+            "amount": 1.0,
+            "mode": "set",
+            "comment": "Maps the physics ripple to the chassis sound."
+        },
+        {
+            "enabled": true,
+            "source": "Primary Motion: Speed",
+            "target": "Master.spatial_phase_offset",
+            "amount": -0.4,
+            "mode": "set",
+            "comment": "Negative offset TEARS the sensation apart at high speeds."
+        }
+    ]
+}

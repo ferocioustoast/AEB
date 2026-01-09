@@ -1,0 +1,19 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 5: Advanced Generative Motion",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates using a System LFO to drive the 'Internal: Primary Motion Driver' to create custom, non-sinusoidal motion patterns like sweeping.",
+        "key_features": [ "Internal: Primary Motion Driver", "LFO-driven Panning" ]
+    },
+    "sound_waves": {
+        "left": [ { "type": "sine", "frequency": 600 } ],
+        "right": [ { "type": "sine", "frequency": 600 } ],
+        "ambient": []
+    },
+    "system_lfos": [
+        { "name": "Movement", "frequency": 0.5, "waveform": "sawtooth" }
+    ],
+    "modulation_matrix": [
+        { "enabled": true, "source": "System LFO: Movement (Unipolar)", "target": "Internal: Primary Motion Driver.value", "amount": 1.0, "mode": "additive" }
+    ]
+}

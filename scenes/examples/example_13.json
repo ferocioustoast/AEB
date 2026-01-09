@@ -1,0 +1,43 @@
+{
+    "preset_metadata": {
+        "preset_name": "Example 13: The Concrete Scraper",
+        "author": "AEB Systems Architect",
+        "description": "Demonstrates Tension (Drag Magnitude). Noise is audible during the cycle (high tension) but dips to silence momentarily at the turnaround points, simulating the loss of friction when reversing direction.",
+        "key_features": [
+            "Internal: Tension",
+            "Turnaround Detection",
+            "Friction Simulation"
+        ]
+    },
+    "loop_motion_type": "triangle",
+    "static_loop_time_s": 1.0,
+    "sound_waves": {
+        "left": [
+            { "type": "sine", "frequency": 200.0, "amplitude": 0.5 },
+            { "type": "pink_noise", "amplitude": 0.0, "comment": "Friction Layer" }
+        ],
+        "right": [
+            { "type": "sine", "frequency": 200.0, "amplitude": 0.5 },
+            { "type": "pink_noise", "amplitude": 0.0, "comment": "Friction Layer" }
+        ],
+        "ambient": []
+    },
+    "internal_tension_limit": 0.05,
+    "internal_tension_release_rate": 0.1,
+    "modulation_matrix": [
+        {
+            "enabled": true,
+            "source": "Internal: Tension",
+            "target": "left.1.amplitude",
+            "amount": 1.0,
+            "mode": "set"
+        },
+        {
+            "enabled": true,
+            "source": "Internal: Tension",
+            "target": "right.1.amplitude",
+            "amount": 1.0,
+            "mode": "set"
+        }
+    ]
+}
