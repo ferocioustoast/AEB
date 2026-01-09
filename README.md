@@ -6,7 +6,7 @@ AEB is a powerful, real-time audio synthesis tool designed for controlling audio
 
 This program generates audio signals intended to control high-voltage e-stim hardware. Misconfiguration or unexpected behavior could result in sudden, painful, or dangerous electric shocks. The creator is not a professional software developer, audio engineer, or electrical engineer. **Use this software entirely at your own risk. You have been warned!**
 
-![AEB Screenshot](GUI.png)
+![AEB Screenshot](imgs/GUI.png)
 
 ## ✨ Core Features
 
