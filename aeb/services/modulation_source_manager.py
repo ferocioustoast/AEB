@@ -1,4 +1,4 @@
-# aeb/services/modulation_source_manager.py (Updated)
+# aeb/services/modulation_source_manager.py
 """
 Contains the ModulationSourceManager, a class responsible for calculating
 all internal modulation sources.

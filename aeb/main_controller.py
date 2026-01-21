@@ -1,4 +1,4 @@
-# aeb/main_controller.py (Updated)
+# aeb/main_controller.py
 """
 Defines the MainController, the central non-GUI component that orchestrates
 the application's backend logic, services, and state management.
