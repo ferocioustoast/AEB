@@ -1,4 +1,4 @@
-# aeb/ui/widgets/source_tuning_tab.py (Updated)
+# aeb/ui/widgets/source_tuning_tab.py
 """
 Defines the SourceTuningTab, which provides a master/detail interface for
 tuning all advanced modulation sources.
@@ -66,10 +66,10 @@ class SourceTuningTab(QWidget):
         panels = {
             "System LFOs": SystemLfosPanel(
                 self.app_context, self.main_window, self.lfo_manager),
+            "Signal Safety & Integrity": self._create_signal_fortress_group(),
             "Somatic State Engine": self._create_somatic_state_engine_group(),
             "Drift & Internal Generative": self._create_drift_group(),
             "Viscoelastic Skin Physics": self._create_viscoelastic_physics_group(),
-            "Clipping Prevention & Headroom": self._create_signal_fortress_group(),
             "Primary Motion Dynamics": self._create_motion_dynamics_group(),
             "Virtual Axis Tuning": self._create_virtual_axis_tuning_group(),
             "Transient Impulse (Ripple)": self._create_transient_impulse_group(),
@@ -114,7 +114,8 @@ class SourceTuningTab(QWidget):
         self.tension_limit_spinbox.setValue(cfg.get('internal_tension_limit'))
         self.tension_release_spinbox.setValue(cfg.get('internal_tension_release_rate'))
 
-        # Clipping Prevention & Headroom
+        # Signal Safety & Integrity
+        self.safety_attack_time_spinbox.setValue(cfg.get('safety_attack_time', 0.1))
         self.generator_headroom_limit_spinbox.setValue(cfg.get('generator_headroom_limit'))
         self.channel_safety_limit_spinbox.setValue(cfg.get('channel_safety_limit'))
 
@@ -170,7 +171,8 @@ class SourceTuningTab(QWidget):
         self.tension_limit_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_limit', v))
         self.tension_release_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_release_rate', v))
 
-        # Clipping Prevention & Headroom
+        # Signal Safety & Integrity
+        self.safety_attack_time_spinbox.valueChanged.connect(lambda v: mwu('safety_attack_time', v))
         self.generator_headroom_limit_spinbox.valueChanged.connect(lambda v: mwu('generator_headroom_limit', v))
         self.channel_safety_limit_spinbox.valueChanged.connect(lambda v: mwu('channel_safety_limit', v))
 
@@ -320,13 +322,23 @@ class SourceTuningTab(QWidget):
         return group
 
     def _create_signal_fortress_group(self) -> QWidget:
-        """Creates the settings panel for the signal integrity limiters."""
-        group = QGroupBox("Clipping Prevention & Headroom")
+        """Creates the settings panel for the signal integrity limiters and safety monitors."""
+        group = QGroupBox("Signal Safety & Integrity")
         layout = QFormLayout(group)
+        
+        self.safety_attack_time_spinbox = QDoubleSpinBox(decimals=3, minimum=0.01, maximum=2.0, singleStep=0.01, suffix=" s")
+        self.safety_attack_time_spinbox.setToolTip(
+            "<b>Slew Limiter:</b> Minimum time for the master volume to go from 0% to 100%.\n"
+            "Protects against instant DC offset jumps and data glitches.\n"
+            "Lower = Faster/Snappier. Higher = Slower/Safer (Default: 0.1s)."
+        )
+        layout.addRow("Safety Attack Time:", self.safety_attack_time_spinbox)
+        
         self.generator_headroom_limit_spinbox = QDoubleSpinBox(decimals=2, minimum=0.1, maximum=10.0, singleStep=0.1)
         self.generator_headroom_limit_spinbox.setToolTip(
             "Stage 2: Sets the max peak for an individual generator. >1.0 allows for 'ducking' effects.")
         layout.addRow("Generator Headroom Limit:", self.generator_headroom_limit_spinbox)
+        
         self.channel_safety_limit_spinbox = QDoubleSpinBox(decimals=3, minimum=0.001, maximum=1.0, singleStep=0.01)
         self.channel_safety_limit_spinbox.setToolTip(
             "Stage 3: The absolute safety ceiling for the final channel mix. 1.0 = no clipping.")

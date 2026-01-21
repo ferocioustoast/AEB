@@ -259,7 +259,7 @@ class ModulationMatrixTab(QWidget):
             new_items = ['left_amplitude', 'right_amplitude', 'ambient_amplitude',
                        'ambient_panning_link_enabled', 'stereo_width', 'pan_offset',
                        'panning_law', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol',
-                       'spatial_phase_offset']
+                       'spatial_phase_offset', 'safety_attack_time']
         elif category_name == 'Ramping':
             new_items = ['ramp_up_enabled', 'ramp_up_time', 'ramp_down_enabled', 'ramp_down_time',
                         'idle_time_before_ramp_down', 'long_idle_enabled',

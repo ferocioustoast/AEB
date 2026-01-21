@@ -29,16 +29,44 @@ class AudioCallbackHandler:
         """
         self.app_context = app_context
         self.sample_rate = AUDIO_SAMPLE_RATE
+        
+        # --- Safety State Tracking ---
+        # Initialize channel states from current config to prevent startup transients.
+        cfg = app_context.config
+        self._last_safe_left = float(cfg.get('left_amplitude', 1.0))
+        self._last_safe_right = float(cfg.get('right_amplitude', 1.0))
+        self._last_safe_ambient = float(cfg.get('ambient_amplitude', 1.0))
+        
+        self._last_safe_master: float = 0.0
+        self._last_safety_log_time: float = 0.0
+
+    def _apply_safety_slew(self, target_val: float, last_safe_val: float, 
+                           limit_per_block: float, param_name: str) -> float:
+        """
+        Clamps the rate of change for a gain parameter and monitors for 
+        dangerous transients.
+        """
+        delta = target_val - last_safe_val
+        clamped_delta = np.clip(delta, -limit_per_block, limit_per_block)
+        
+        # Monitor Logic: Distinguish between normal logic-thread interpolation
+        # and dangerous transients.
+        # Threshold 0.1 (10% volume jump) indicates a significant glitch or 
+        # aggressive modulation that requires a warning.
+        if abs(delta) > 0.1 and abs(delta - clamped_delta) > 1e-4:
+            current_time = time.perf_counter()
+            if current_time - self._last_safety_log_time > 0.5:
+                self.app_context.signals.log_message.emit(
+                    f"SAFETY WARNING: Large transient clamped on '{param_name}'. "
+                    f"Jump of {delta:.2f} restricted to {clamped_delta:.4f}."
+                )
+                self._last_safety_log_time = current_time
+            
+        return last_safe_val + clamped_delta
 
     def process_audio_block(self, outdata, frames, time_info, status):
         """
         Main real-time audio processing callback executed by the sound device.
-
-        Args:
-            outdata: The output buffer to be filled with audio data.
-            frames: The number of frames (samples) to generate.
-            time_info: Timing information from the audio stream.
-            status: Status flags from the audio stream.
         """
         ctx = self.app_context
         if status:
@@ -48,6 +76,7 @@ class AudioCallbackHandler:
                 ctx.signals.log_message.emit("AudioCB: Output overflow")
         if ctx.sound_is_paused_for_callback:
             outdata.fill(0.0)
+            self._last_safe_master = 0.0
             return
         try:
             with ctx.audio_callback_configs_lock, ctx.live_params_lock:
@@ -62,15 +91,12 @@ class AudioCallbackHandler:
     def _mix_final_output(self, outdata, frames: int):
         """
         Performs the final mixing and panning of all audio channels.
-
-        Args:
-            outdata: The output buffer to be filled.
-            frames: The number of frames (samples) to generate.
         """
         ctx = self.app_context
         live = ctx.live_params
         transition_state = ctx.active_transition_state
 
+        # Motion volume displays continue to use standard low-pass smoothing
         ctx.actual_motor_vol_l += (
             (ctx.live_motor_volume_left - ctx.actual_motor_vol_l) *
             ctx.motor_vol_smoothing
@@ -79,17 +105,48 @@ class AudioCallbackHandler:
             (ctx.live_motor_volume_right - ctx.actual_motor_vol_r) *
             ctx.motor_vol_smoothing
         )
-
         ctx.actual_positional_ambient_gain += (
             (ctx.live_positional_ambient_gain - ctx.actual_positional_ambient_gain) *
             ctx.motor_vol_smoothing
         )
 
+        # --- Slew Limit Calculation ---
+        safety_attack_time = live.get('safety_attack_time', 0.1)
+        slew_rate = 1.0 / max(safety_attack_time, 0.001)
+        dt = frames / self.sample_rate
+        max_change = slew_rate * dt
+
+        # 1. Global Master Gain (System Ramping & Logic)
         sensitivity_ramp = self._calculate_sensitivity_ramp()
         transition_ramp = transition_state.get('volume_multiplier', 1.0)
-        master_gain = (ctx.live_master_ramp_multiplier * sensitivity_ramp *
-                       transition_ramp)
+        raw_target_master = (ctx.live_master_ramp_multiplier * sensitivity_ramp *
+                             transition_ramp)
+        
+        safe_master_gain = self._apply_safety_slew(
+            raw_target_master, self._last_safe_master, max_change, "Master"
+        )
+        self._last_safe_master = safe_master_gain
 
+        # 2. Channel Amplitudes (User/Mod Matrix Parameters)
+        target_left = float(live.get('left_amplitude', 1.0))
+        target_right = float(live.get('right_amplitude', 1.0))
+        target_ambient = float(live.get('ambient_amplitude', 1.0))
+
+        safe_left_amp = self._apply_safety_slew(
+            target_left, self._last_safe_left, max_change, "Left Amp"
+        )
+        safe_right_amp = self._apply_safety_slew(
+            target_right, self._last_safe_right, max_change, "Right Amp"
+        )
+        safe_ambient_amp = self._apply_safety_slew(
+            target_ambient, self._last_safe_ambient, max_change, "Ambient Amp"
+        )
+
+        self._last_safe_left = safe_left_amp
+        self._last_safe_right = safe_right_amp
+        self._last_safe_ambient = safe_ambient_amp
+
+        # 3. Audio Mixing
         all_gens = [g for sublist in ctx.source_channel_generators.values()
                     for g in sublist]
         is_any_soloed = any(g.config.get('soloed', False) for g in all_gens)
@@ -98,14 +155,12 @@ class AudioCallbackHandler:
         ambient_l, ambient_r = self._generate_panned_ambient_mix(
             frames, is_any_soloed)
 
-        final_action_l = (action_l *
-                          live.get('left_amplitude', 1.0))
-        final_action_r = (action_r *
-                          live.get('right_amplitude', 1.0))
+        final_action_l = action_l * safe_left_amp
+        final_action_r = action_r * safe_right_amp
 
         pos_ambient_gain = ctx.actual_positional_ambient_gain
-        final_ambient_l = ambient_l * pos_ambient_gain * live.get('ambient_amplitude', 1.0)
-        final_ambient_r = ambient_r * pos_ambient_gain * live.get('ambient_amplitude', 1.0)
+        final_ambient_l = ambient_l * pos_ambient_gain * safe_ambient_amp
+        final_ambient_r = ambient_r * pos_ambient_gain * safe_ambient_amp
 
         if live.get('ambient_panning_link_enabled', False):
             final_ambient_l *= ctx.actual_motor_vol_l
@@ -114,6 +169,7 @@ class AudioCallbackHandler:
         left_mix = final_action_l + final_ambient_l
         right_mix = final_action_r + final_ambient_r
 
+        # Hard Clipping Prevention (Look-ahead Dynamic Scaling)
         safety_limit = live.get('channel_safety_limit', 1.0)
         peak_l = np.max(np.abs(left_mix))
         peak_r = np.max(np.abs(right_mix))
@@ -132,8 +188,9 @@ class AudioCallbackHandler:
         elif master_pan_offset < 0:
             mix_r *= (1.0 + master_pan_offset)
 
-        outdata[:, 0] = np.clip(mix_l * master_gain, -1.0, 1.0)
-        outdata[:, 1] = np.clip(mix_r * master_gain, -1.0, 1.0)
+        # Apply final safe master gain
+        outdata[:, 0] = np.clip(mix_l * safe_master_gain, -1.0, 1.0)
+        outdata[:, 1] = np.clip(mix_r * safe_master_gain, -1.0, 1.0)
 
         store = ctx.modulation_source_store
         store.set_source("Internal: Left Channel Output Level",
@@ -182,14 +239,11 @@ class AudioCallbackHandler:
         stationary_bus_l = np.zeros(frames, dtype=np.float32)
         stationary_bus_r = np.zeros(frames, dtype=np.float32)
 
-        # In 'layered' mode, the L/R channel distinction is conceptual; we
-        # process all action channel waves together to determine their true destination.
         if panning_law == 'layered':
             action_generators = (
                 ctx.source_channel_generators.get('left', []) +
                 ctx.source_channel_generators.get('right', [])
             )
-            # We must track original channel/index for parameter lookup.
             action_gen_map = [('left', i) for i in range(len(ctx.source_channel_generators.get('left', [])))] + \
                              [('right', i) for i in range(len(ctx.source_channel_generators.get('right', [])))]
 
@@ -223,7 +277,7 @@ class AudioCallbackHandler:
                     moving_bus_l += wave_data * p_gain_l
                     moving_bus_r += wave_data * p_gain_r
 
-        else:  # Standard (non-layered) panning laws
+        else:
             for key in ['left', 'right']:
                 bus_l = moving_bus_l if key == 'left' else np.zeros(frames, dtype=np.float32)
                 bus_r = moving_bus_r if key == 'right' else np.zeros(frames, dtype=np.float32)
@@ -248,20 +302,14 @@ class AudioCallbackHandler:
                     moving_bus_l += bus_l
                     moving_bus_r = bus_r
 
-        # Apply the global panner ONLY to the moving bus
         panned_moving_bus_l = moving_bus_l * ctx.actual_motor_vol_l
         panned_moving_bus_r = moving_bus_r * ctx.actual_motor_vol_r
 
-        # Apply the zonal pressure master gain to the stationary bus
         zonal_pressure = ctx.live_params.get('zonal_pressure', 1.0)
         stationary_bus_l *= zonal_pressure
         stationary_bus_r *= zonal_pressure
 
-        # Sum the two busses for the final action mix
-        final_l = panned_moving_bus_l + stationary_bus_l
-        final_r = panned_moving_bus_r + stationary_bus_r
-
-        return final_l, final_r
+        return (panned_moving_bus_l + stationary_bus_l), (panned_moving_bus_r + stationary_bus_r)
 
     def _generate_panned_ambient_mix(self, frames: int,
                                      is_any_soloed: bool

@@ -17,14 +17,14 @@ This program generates audio signals intended to control high-voltage e-stim har
 *   **Graphical Motion Mapping:** A fully user-configurable graphical curve editor gives designers absolute control over how channel volumes respond to the primary motion input, moving beyond simple crossfades to a true positional amplitude mapping system.
 *   **Per-Wave Spatial Mapping:** Use graphical curves on a per-wave basis to define positional volume gates, making textures appear or disappear as the primary motion passes through specific zones.
 *   **Positional Ambient Envelopment:** Define a custom graphical curve to control the overall intensity of the ambient channel based on the primary motion input, creating effects like a sensation fading in with depth.
-*   **Rhythmic Screen Flow Analysis:** Analyzes on-screen video content to extract the dominant rhythm and intensity. It translates visual motion energy directly into a phase-locked control signal, allowing the stimulation tempo to automatically accelerate and decelerate in sync with the action on screen.
+*   **Rhythmic Screen Flow Analysis:** Analyzes on-screen video content to extract the dominant rhythm and intensity. It translates visual motion energy directly into a phase-locked control signal, allowing the stimulation tempo to automatically accelerate and decelerate in sync with the action on screen.
 *   **Seamless Scene Transitioning:** Load multiple, complete sound designs ("scenes") into a playlist and transition between them smoothly with a crossfade, triggered by hotkeys or automated by script events.
 *   **Deep Modulation Matrix:** Achieve unparalleled creative control by modulating nearly any parameter in the engine—from audio filters and LFOs to the physics of the virtual axes themselves—using any available input source.
 *   **Three-Channel Audio Architecture:**
     *   **Action Channels (Left/Right):** A traditional stereo pair driven by a primary motion source to create dynamic, panned sensations.
     *   **Ambient Channel:** A separate stereo audio bed for creating environmental or foundational sensations, with its own independent panning.
 *   **Advanced Waveform Generation:** Layer multiple oscillators on each channel, choosing from Sine, Square, Sawtooth, Triangle, Noise, Additive Synthesis, and a full-featured Sampler.
-*   **Built-in Signal Integrity Fortress:** A multi-stage, defense-in-depth system prevents audio clipping at every stage of the signal path, ensuring safe, predictable, and comfortable output.
+*   **Signal Integrity & Dynamic Limiting:** A multi-stage defense-in-depth system ensures safe output. This includes **Safety Slew Limiting** to prevent instantaneous voltage jumps and **Dynamic Gain Scaling** which mathematically shrinks waveforms that exceed the safety limit, preserving their shape and texture without inducing distortion (hard clipping).
 *   **Powerful Input Sources:** Control the audio with a variety of inputs including T-Code (WebSocket/UDP), Screen Flow, Audio Input Analysis, a bank of configurable System LFOs, and a virtual X360 Controller.
 *   **Dual Control Layers: Global & Scene-Specific**
     *   **Global Actions & Hotkeys:** Define a personal, persistent set of hotkeys for application-level control (like switching scenes). These are saved locally and are never overwritten by loading a scene.
@@ -104,7 +104,7 @@ For maximum stability and to prevent conflicts with other Python packages, it is
 *   **Servers & TCode:** Enable and configure the WSDM client, UDP server, and Virtual X360 Controller.
 *   **Live Sync:** Controls for real-time synchronization. **Screen Flow** performs rhythmic motion analysis on video content, while **Audio Input Analysis** creates sources from system audio.
 *   **Motion Feel:** The "easy mode" for adding intuitive effects based on both real and synthesized T-Code axes.
-*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **System LFOs**, **Drift**, **Thermodynamics**, **Viscoelastic Physics**, **Pneumatics**, and **Primary Motion Dynamics**.
+*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **Signal Safety & Integrity**, **System LFOs**, **Drift**, **Thermodynamics**, **Viscoelastic Physics**, **Pneumatics**, and **Primary Motion Dynamics**.
 *   **Modulation Matrix:** The "expert mode" for creating custom, conditional rules to modulate any parameter from any source.
 *   **Volume Ramping:** Fine-tune the automatic fade-in/fade-out behavior.
 *   **Program Launcher:** Configure external programs to launch automatically.
