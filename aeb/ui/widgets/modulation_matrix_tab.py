@@ -287,14 +287,15 @@ class ModulationMatrixTab(QWidget):
                 'internal_drift_speed', 'internal_drift_octaves',
                 'env_follower_attack_ms', 'env_follower_release_ms',
                 'motion_norm_window_s', 'motion_speed_floor', 'motion_accel_floor',
-                'motion_jolt_floor', 'velocity_smoothing', 
-                'vas_vl1_end_zone_size', 'vas_vr0_stiffness', 'vas_vr0_damping', 
-                'vas_vl1_stiffness', 'vas_vl1_damping', 'vas_vv0_stiffness', 
+                'motion_jolt_floor', 'velocity_smoothing',
+                'vas_vl1_end_zone_size', 'vas_vr0_stiffness', 'vas_vr0_damping',
+                'vas_vl1_stiffness', 'vas_vl1_damping', 'vas_vv0_stiffness',
                 'vas_vv0_damping',
                 'somatic_excitation_buildup_s', 'somatic_excitation_decay_s',
                 'somatic_excitation_cooldown_s', 'somatic_stress_attack_s',
                 'somatic_stress_release_s',
-                'impulse_mass', 'impulse_spring', 'impulse_damping', 'impulse_input_gain'
+                'impulse_mass', 'impulse_spring', 'impulse_damping',
+                'impulse_input_gain', 'input_inertia'
             ]
         
         # --- Motion Feel (Context Aware) ---
@@ -591,7 +592,7 @@ class ModulationMatrixTab(QWidget):
             amount_stack.setCurrentIndex(1)
         elif target == 'Master.panning_law':
             with self.main_window._block_signals(combo):
-                combo.clear(); combo.addItems(['tactile_power', 'equal_power', 'linear', 'custom', 'conduit'])
+                combo.clear(); combo.addItems(['layered', 'tactile_power', 'equal_power', 'linear', 'custom'])
                 combo.setCurrentText(str(amount))
             amount_stack.setCurrentIndex(1)
         elif target == 'Loop.motion_type':

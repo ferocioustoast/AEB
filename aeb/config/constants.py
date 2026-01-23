@@ -1,4 +1,5 @@
 # aeb/config/constants.py
+
 """
 Contains default configuration dictionaries, audio constants, and other
 static values for the Audio E-stim Bridge application.
@@ -138,7 +139,7 @@ DEFAULT_SETTINGS: dict = {
     'spatial_phase_offset': 0.0,
     'generator_headroom_limit': 1.0,
     'channel_safety_limit': 1.0,
-    'safety_attack_time': 0.1,
+    'safety_attack_time': 0.04,
 
     # Servers & TCode Input
     'udp_port': 8000,
@@ -217,7 +218,8 @@ DEFAULT_SETTINGS: dict = {
     'motion_jolt_floor': 2500.0,
     'motion_span_decay_s': 3.0,
     'velocity_smoothing': 0.1,
-    
+    'input_inertia': 0.15,
+
     # Somatic State Engine (Thermodynamic Integration)
     'somatic_excitation_buildup_s': 60.0,
     'somatic_excitation_decay_s': 30.0,

@@ -1,4 +1,5 @@
 # aeb/ui/widgets/source_tuning_tab.py
+
 """
 Defines the SourceTuningTab, which provides a master/detail interface for
 tuning all advanced modulation sources.
@@ -125,6 +126,7 @@ class SourceTuningTab(QWidget):
         self.motion_accel_floor_spinbox.setValue(cfg.get('motion_accel_floor'))
         self.velocity_smoothing_spinbox.setValue(cfg.get('velocity_smoothing'))
         self.motion_span_decay_spinbox.setValue(cfg.get('motion_span_decay_s'))
+        self.input_inertia_spinbox.setValue(cfg.get('input_inertia'))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.setValue(cfg.get('motion_jolt_floor'))
@@ -182,6 +184,7 @@ class SourceTuningTab(QWidget):
         self.motion_accel_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_accel_floor', v))
         self.velocity_smoothing_spinbox.valueChanged.connect(lambda v: mwu('velocity_smoothing', v))
         self.motion_span_decay_spinbox.valueChanged.connect(lambda v: mwu('motion_span_decay_s', v))
+        self.input_inertia_spinbox.valueChanged.connect(lambda v: mwu('input_inertia', v))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_jolt_floor', v))
@@ -330,7 +333,7 @@ class SourceTuningTab(QWidget):
         self.safety_attack_time_spinbox.setToolTip(
             "<b>Slew Limiter:</b> Minimum time for the master volume to go from 0% to 100%.\n"
             "Protects against instant DC offset jumps and data glitches.\n"
-            "Lower = Faster/Snappier. Higher = Slower/Safer (Default: 0.1s)."
+            "Lower = Faster/Snappier. Higher = Slower/Safer."
         )
         layout.addRow("Safety Attack Time:", self.safety_attack_time_spinbox)
         
@@ -389,6 +392,15 @@ class SourceTuningTab(QWidget):
             "Prevents the value from getting stuck high during pauses."
         )
         layout.addRow("Motion Span Decay:", self.motion_span_decay_spinbox)
+
+        self.input_inertia_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.99, singleStep=0.05)
+        self.input_inertia_spinbox.setToolTip(
+            "Simulates physical weight (Inertial Smoothing).\n"
+            "Higher values smooth out jerky input but introduce lag.\n"
+            "Warning: High values will significantly dampen Friction, Jolt, and Impact effects."
+        )
+        layout.addRow("Input Inertia (Mass):", self.input_inertia_spinbox)
+
         return group
 
     def _create_virtual_axis_tuning_group(self) -> QWidget:
