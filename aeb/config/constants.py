@@ -107,6 +107,9 @@ DEFAULT_SETTINGS: dict = {
         "Primary Motion: Position": 0.0,
         "Primary Motion: Velocity": 0.0,
         "Primary Motion: Speed": 0.0, "Primary Motion: Acceleration": 0.0,
+        "Primary Motion: Direction (Uni)": 0.5,
+        "Primary Motion: Direction (Bi)": 0.0,
+        
         "Screen Flow: Position": 0.0, "Screen Flow: Rhythm": 0.0, "Screen Flow: Intensity": 0.0,
     },
 
@@ -219,6 +222,8 @@ DEFAULT_SETTINGS: dict = {
     'motion_span_decay_s': 3.0,
     'velocity_smoothing': 0.1,
     'input_inertia': 0.15,
+    'motion_direction_slew_s': 0.1,
+    'motion_direction_deadzone': 0.001,
 
     # Somatic State Engine (Thermodynamic Integration)
     'somatic_excitation_buildup_s': 60.0,

@@ -253,7 +253,7 @@ class MainController(QObject):
             # SCENE/LIVE SETTINGS - CRITICAL LOCKING SECTION
             with self.app_context.live_params_lock:
                 old_value = self.app_context.config.get(setting_key)
-                if old_value == new_value:
+                if old_value == new_value and setting_key != 'modulation_matrix':
                     return
                 
                 self.app_context.config.set(setting_key, new_value)
@@ -605,7 +605,7 @@ class MainController(QObject):
             source_prefixes = (
                 "Primary Motion:", "TCode: V-", "Internal: System Excitation",
                 "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
-                "Internal: Motion Span"
+                "Internal: Motion Span", "Internal: Transient Impulse"
             )
             for rule in self.app_context.config.get('modulation_matrix', []):
                 if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):

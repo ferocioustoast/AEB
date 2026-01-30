@@ -68,6 +68,10 @@ class ModulationSourceManager:
         self.vv0_velocity: float = 0.0
         self.va0_pressure: float = 0.0
 
+        # Directional Hysteresis State
+        self._direction_target: float = 0.5
+        self._direction_current_val: float = 0.5
+
         # Viscoelastic Physics Variables
         self.tension_offset: float = 0.0
 
@@ -113,7 +117,9 @@ class ModulationSourceManager:
 
         self._motion_source_keys = {
             "Primary Motion: Speed", "Primary Motion: Acceleration",
-            "Primary Motion: Velocity", "TCode: V-R0", "TCode: V-L1",
+            "Primary Motion: Velocity", "Primary Motion: Direction (Uni)",
+            "Primary Motion: Direction (Bi)",
+            "TCode: V-R0", "TCode: V-L1",
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
             "Internal: Transient Impulse", "Internal: Drift",
@@ -161,6 +167,10 @@ class ModulationSourceManager:
         self._span_current_smoothed = 0.0
         self._span_last_turnaround_time = current_time
         self._span_initialized = False
+
+        # Reset Direction
+        self._direction_target = 0.5
+        self._direction_current_val = 0.5
 
         self.motion_speed_history.clear()
         self.motion_accel_history.clear()
@@ -278,6 +288,8 @@ class ModulationSourceManager:
             self.last_motion_value = primary_motion_value
             # Reset span state when inactive so it re-initializes on resume
             self._span_initialized = False 
+            # Reset direction target to neutral
+            self._direction_target = 0.5
             return
 
         if not self._was_motion_active:
@@ -344,6 +356,31 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Speed", normalized_speed)
         store.set_source("Primary Motion: Acceleration", normalized_accel)
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
+
+        # --- Directional Logic (Anisotropic Haptics) ---
+        dir_slew_s = max(live.get('motion_direction_slew_s', 0.1), 0.01)
+        dir_deadzone = live.get('motion_direction_deadzone', 0.001)
+
+        # 1. Hysteresis / Latch
+        if raw_velocity > dir_deadzone:
+            self._direction_target = 1.0
+        elif raw_velocity < -dir_deadzone:
+            self._direction_target = 0.0
+        # Else: hold previous target
+
+        # 2. Slew Limiting
+        diff = self._direction_target - self._direction_current_val
+        max_step = (1.0 / dir_slew_s) * safe_dt
+        
+        if abs(diff) <= max_step:
+            self._direction_current_val = self._direction_target
+        else:
+            self._direction_current_val += math.copysign(max_step, diff)
+
+        # 3. Output
+        store.set_source("Primary Motion: Direction (Uni)", self._direction_current_val)
+        store.set_source("Primary Motion: Direction (Bi)", (self._direction_current_val * 2.0) - 1.0)
+        # -----------------------------------------------
 
         self._synthesize_virtual_axes(
             primary_motion_value, normalized_speed, acceleration, jolt, 

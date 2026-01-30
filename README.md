@@ -38,7 +38,7 @@ AEB's core principle is to use **Input Sources** to generate normalized control 
 2.  **Hybrid Layered Rendering:** The engine creates complex sensations by combining two types of layers on the Action Channels:
     *   **Moving Layers:** These create the core feeling of a moving point of contact, driven by a master panning algorithm.
     *   **Zonal Layers:** These create stationary textures that can appear or disappear as the moving layers pass through them.
-3.  **Virtual Axis Synthesis:** The engine analyzes the *character* of the Primary Motion—its speed, acceleration, velocity, and "jolt"—to synthesize additional control sources for creating richer, more dynamic effects.
+3.  **Virtual Axis Synthesis:** The engine analyzes the *character* of the Primary Motion—its speed, acceleration, velocity, direction, and "jolt"—to synthesize additional control sources for creating richer, more dynamic effects.
 4.  **Global & Scene Hotkeys:** Key presses are checked first against Global Actions for app-level control, then passed down to the scene's Modulation Matrix for creative, scene-internal logic.
 5.  **Motion Feel:** This system runs in parallel, providing an "easy mode" to add intuitive layers of sensation on top of the main movement using both real and synthesized T-Code axes.
 

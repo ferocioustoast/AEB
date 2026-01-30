@@ -127,6 +127,8 @@ class SourceTuningTab(QWidget):
         self.velocity_smoothing_spinbox.setValue(cfg.get('velocity_smoothing'))
         self.motion_span_decay_spinbox.setValue(cfg.get('motion_span_decay_s'))
         self.input_inertia_spinbox.setValue(cfg.get('input_inertia'))
+        self.motion_direction_slew_spinbox.setValue(cfg.get('motion_direction_slew_s'))
+        self.motion_direction_deadzone_spinbox.setValue(cfg.get('motion_direction_deadzone'))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.setValue(cfg.get('motion_jolt_floor'))
@@ -185,6 +187,8 @@ class SourceTuningTab(QWidget):
         self.velocity_smoothing_spinbox.valueChanged.connect(lambda v: mwu('velocity_smoothing', v))
         self.motion_span_decay_spinbox.valueChanged.connect(lambda v: mwu('motion_span_decay_s', v))
         self.input_inertia_spinbox.valueChanged.connect(lambda v: mwu('input_inertia', v))
+        self.motion_direction_slew_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_slew_s', v))
+        self.motion_direction_deadzone_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_deadzone', v))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_jolt_floor', v))
@@ -357,26 +361,32 @@ class SourceTuningTab(QWidget):
         )
         layout = QFormLayout(group)
         
+        def add_row_with_tooltip(label_text, widget):
+            """Helper to ensure the label gets the same tooltip as the widget."""
+            label = QLabel(label_text)
+            label.setToolTip(widget.toolTip())
+            layout.addRow(label, widget)
+
         self.motion_norm_window_spinbox = QDoubleSpinBox(decimals=1, minimum=1.0, maximum=60.0, suffix=" s")
         self.motion_norm_window_spinbox.setToolTip(
             "The rolling time window used to learn the 'Maximum Speed'.\n"
             "The system normalizes current speed against the peak found in this window."
         )
-        layout.addRow("Normalization Window:", self.motion_norm_window_spinbox)
+        add_row_with_tooltip("Normalization Window:", self.motion_norm_window_spinbox)
         
         self.motion_speed_floor_spinbox = QDoubleSpinBox(decimals=1, minimum=1.0, maximum=100.0)
         self.motion_speed_floor_spinbox.setToolTip(
             "Minimum value for the speed normalizer.\n"
             "Prevents the system from becoming infinitely sensitive during very slow movements."
         )
-        layout.addRow("Speed Normalization Floor:", self.motion_speed_floor_spinbox)
+        add_row_with_tooltip("Speed Normalization Floor:", self.motion_speed_floor_spinbox)
         
         self.motion_accel_floor_spinbox = QDoubleSpinBox(decimals=1, minimum=10.0, maximum=500.0)
         self.motion_accel_floor_spinbox.setToolTip(
             "Minimum ceiling for acceleration normalization.\n"
             "Prevents small jitters from registering as 100% acceleration."
         )
-        layout.addRow("Acceleration Norm. Floor:", self.motion_accel_floor_spinbox)
+        add_row_with_tooltip("Acceleration Norm. Floor:", self.motion_accel_floor_spinbox)
         
         self.velocity_smoothing_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.99, singleStep=0.01)
         self.velocity_smoothing_spinbox.setToolTip(
@@ -384,14 +394,14 @@ class SourceTuningTab(QWidget):
             "0.0 = Raw, Instant.\n"
             "0.9 = Very smooth, but significant lag."
         )
-        layout.addRow("Velocity Smoothing:", self.velocity_smoothing_spinbox)
+        add_row_with_tooltip("Velocity Smoothing:", self.velocity_smoothing_spinbox)
 
         self.motion_span_decay_spinbox = QDoubleSpinBox(decimals=1, minimum=0.5, maximum=60.0, singleStep=0.5, suffix=" s")
         self.motion_span_decay_spinbox.setToolTip(
             "How long the 'Motion Span' (Travel Depth) value holds its peak before decaying.\n"
             "Prevents the value from getting stuck high during pauses."
         )
-        layout.addRow("Motion Span Decay:", self.motion_span_decay_spinbox)
+        add_row_with_tooltip("Motion Span Decay:", self.motion_span_decay_spinbox)
 
         self.input_inertia_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.99, singleStep=0.05)
         self.input_inertia_spinbox.setToolTip(
@@ -399,7 +409,20 @@ class SourceTuningTab(QWidget):
             "Higher values smooth out jerky input but introduce lag.\n"
             "Warning: High values will significantly dampen Friction, Jolt, and Impact effects."
         )
-        layout.addRow("Input Inertia (Mass):", self.input_inertia_spinbox)
+        add_row_with_tooltip("Input Inertia (Mass):", self.input_inertia_spinbox)
+
+        self.motion_direction_slew_spinbox = QDoubleSpinBox(decimals=2, minimum=0.01, maximum=5.0, singleStep=0.05, suffix=" s")
+        self.motion_direction_slew_spinbox.setToolTip(
+            "Smoothing time for the 'Primary Motion: Direction' signal.\n"
+            "Prevents audio clicks when reversing direction."
+        )
+        add_row_with_tooltip("Direction Slew Time:", self.motion_direction_slew_spinbox)
+
+        self.motion_direction_deadzone_spinbox = QDoubleSpinBox(decimals=4, minimum=0.0, maximum=0.1, singleStep=0.001)
+        self.motion_direction_deadzone_spinbox.setToolTip(
+            "The minimum velocity required to register a change in direction."
+        )
+        add_row_with_tooltip("Direction Deadzone:", self.motion_direction_deadzone_spinbox)
 
         return group
 
