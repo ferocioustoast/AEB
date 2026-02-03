@@ -10,25 +10,25 @@ This program generates audio signals intended to control high-voltage e-stim har
 
 ## ✨ Core Features
 
-*   **Real-Time Synthesis Engine:** All audio is generated live. Any parameter change is reflected instantly in the output.
-*   **Hybrid Layered Rendering Engine:** Build complex, physically-modeled objects by combining globally-panned "moving" layers with position-locked "zonal" layers. This allows for sensations like a moving ring revealing a foundational texture behind it.
-*   **Virtual Axis Synthesis:** Derives complex, multi-dimensional sensations like twist, pressure, texture, pneumatics (compression/suction), and other conceptual physical effects from a single motion input, creating a rich physical experience from simple script data.
-*   **Organic Drift Synthesis:** A specialized generative engine produces smooth, non-repeating, fractal motion (like wind or tide) to modulate parameters, preventing sensory habituation during long sessions.
-*   **Graphical Motion Mapping:** A fully user-configurable graphical curve editor gives designers absolute control over how channel volumes respond to the primary motion input, moving beyond simple crossfades to a true positional amplitude mapping system.
-*   **Per-Wave Spatial Mapping:** Use graphical curves on a per-wave basis to define positional volume gates, making textures appear or disappear as the primary motion passes through specific zones.
-*   **Positional Ambient Envelopment:** Define a custom graphical curve to control the overall intensity of the ambient channel based on the primary motion input, creating effects like a sensation fading in with depth.
-*   **Rhythmic Screen Flow Analysis:** Analyzes on-screen video content to extract the dominant rhythm and intensity. It translates visual motion energy directly into a phase-locked control signal, allowing the stimulation tempo to automatically accelerate and decelerate in sync with the action on screen.
-*   **Seamless Scene Transitioning:** Load multiple, complete sound designs ("scenes") into a playlist and transition between them smoothly with a crossfade, triggered by hotkeys or automated by script events.
-*   **Deep Modulation Matrix:** Achieve unparalleled creative control by modulating nearly any parameter in the engine—from audio filters and LFOs to the physics of the virtual axes themselves—using any available input source.
-*   **Three-Channel Audio Architecture:**
-    *   **Action Channels (Left/Right):** A traditional stereo pair driven by a primary motion source to create dynamic, panned sensations.
-    *   **Ambient Channel:** A separate stereo audio bed for creating environmental or foundational sensations, with its own independent panning.
-*   **Advanced Waveform Generation:** Layer multiple oscillators on each channel, choosing from Sine, Square, Sawtooth, Triangle, Noise, Additive Synthesis, and a full-featured Sampler.
-*   **Signal Integrity & Dynamic Limiting:** A multi-stage defense-in-depth system ensures safe output. This includes **Safety Slew Limiting** to prevent instantaneous voltage jumps and **Dynamic Gain Scaling** which mathematically shrinks waveforms that exceed the safety limit, preserving their shape and texture without inducing distortion (hard clipping).
-*   **Powerful Input Sources:** Control the audio with a variety of inputs including T-Code (WebSocket/UDP), Screen Flow, Audio Input Analysis, a bank of configurable System LFOs, and a virtual X360 Controller.
-*   **Dual Control Layers: Global & Scene-Specific**
-    *   **Global Actions & Hotkeys:** Define a personal, persistent set of hotkeys for application-level control (like switching scenes). These are saved locally and are never overwritten by loading a scene.
-    *   **Scene Hotkeys & Modulation Matrix:** Define hotkeys *within* a scene file for creative, scene-internal logic. Create event-driven rules to modulate any parameter based on script dynamics, timers, or these scene-specific hotkeys.
+### 🔊 Advanced Synthesis Engine
+*   **Real-Time Generation:** All audio is generated live. Any parameter change is reflected instantly—no pre-baked audio files or latency.
+*   **Advanced Waveform Generation**: Layer multiple oscillators including Sine, Square, Noise, and a full-featured Sampler.
+*   **Hybrid Layered Rendering:** A sophisticated model that blends **Moving Layers** (globally panned) with **Zonal Layers** (position-locked textures). Create a moving "ring" that reveals a foundational texture as it passes.
+*   **Three-Channel Architecture:** Dual **Action Channels** for primary motion and a dedicated **Ambient Channel** for foundational environmental sensations.
+
+### ⚛️ Virtual Axis & Somatic Physics
+*   **Virtual Axis Synthesis (VAS):** Derives multi-dimensional sensations—like **Twist, Pressure, and Pneumatics**—from a single 1D motion input using real-time derivative analysis.
+*   **Somatic State Modeling:** The engine tracks conceptual physical states like **Kinetic Stress** (friction spikes), **System Excitation** (session "heat"), and **Transient Impulses** (virtual ripple physics).
+*   **Organic Drift Synthesis:** Prevents sensory habituation using a generative fractal engine that produces smooth, non-repeating motion (like wind or tides).
+
+### 🎮 Intelligence & Control
+*   **Deep Modulation Matrix:** Achieve total creative control by routing any source (Gamepad, T-Code, LFOs, Physics) to nearly any parameter in the engine.
+*   **Rhythmic Screen Flow:** Automatically syncs stimulation tempo and intensity to on-screen video content using real-time motion energy analysis.
+*   **Graphical Motion Mapping:** Replace simple crossfades with custom **Amplitude Curves**. Control exactly how every wave responds to its position in 3D space.
+
+### 🛡️ Signal Integrity & Safety
+*   **Defense-in-Depth Protection:** A multi-stage safety system including **Slew Limiting** (to prevent voltage jumps) and **Dynamic Gain Scaling** (to prevent clipping while preserving texture).
+*   **Intelligent Volume Ramping:** Automatic, configurable fade-in/fade-out logic triggered by input activity, ensuring no sudden shocks when starting or stopping.
 
 ## ⚙️ How it Works
 
