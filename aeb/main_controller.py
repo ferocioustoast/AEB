@@ -605,7 +605,7 @@ class MainController(QObject):
             source_prefixes = (
                 "Primary Motion:", "TCode: V-", "Internal: System Excitation",
                 "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
-                "Internal: Motion Span", "Internal: Transient Impulse"
+                "Internal: Motion Span", "Internal: Transient Impulse", "Internal: Motion Cycle Random"
             )
             for rule in self.app_context.config.get('modulation_matrix', []):
                 if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):

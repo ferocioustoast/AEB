@@ -72,6 +72,11 @@ class ModulationSourceManager:
         self._direction_target: float = 0.5
         self._direction_current_val: float = 0.5
 
+        # Motion Cycle Randomizer State (Event-Driven)
+        self._mcr_current_value: float = 0.5
+        self._mcr_trend_is_up: bool = True
+        self._mcr_last_extreme: float = 0.0
+
         # Viscoelastic Physics Variables
         self.tension_offset: float = 0.0
 
@@ -123,7 +128,7 @@ class ModulationSourceManager:
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
             "Internal: Transient Impulse", "Internal: Drift",
-            "Internal: Motion Span"
+            "Internal: Motion Span", "Internal: Motion Cycle Random"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -168,9 +173,12 @@ class ModulationSourceManager:
         self._span_last_turnaround_time = current_time
         self._span_initialized = False
 
-        # Reset Direction
+        # Reset Direction & Motion Cycle Random
         self._direction_target = 0.5
         self._direction_current_val = 0.5
+        self._mcr_current_value = 0.5
+        self._mcr_trend_is_up = True
+        self._mcr_last_extreme = 0.0
 
         self.motion_speed_history.clear()
         self.motion_accel_history.clear()
@@ -265,7 +273,9 @@ class ModulationSourceManager:
         """Resets all motion-derived modulation sources to zero."""
         store = self.app_context.modulation_source_store
         for key in self._motion_source_keys:
-            store.set_source(key, 0.0)
+            # Special case: Motion Cycle Random holds its value on stop, don't zero it
+            if key != "Internal: Motion Cycle Random":
+                store.set_source(key, 0.0)
 
     def _update_normalization_caches(self):
         """Updates cached normalization ceilings."""
@@ -290,6 +300,8 @@ class ModulationSourceManager:
             self._span_initialized = False 
             # Reset direction target to neutral
             self._direction_target = 0.5
+            # Reset MCR initialization
+            self._mcr_last_extreme = 0.0
             return
 
         if not self._was_motion_active:
@@ -303,6 +315,7 @@ class ModulationSourceManager:
             self.smoothed_velocity = 0.0
             self._span_target_value = 0.0
             self._span_current_smoothed = 0.0
+            self._mcr_last_extreme = primary_motion_value # Initialize MCR anchor
             self._was_motion_active = True
 
         if current_time - self._last_cache_update_time > self.CACHE_UPDATE_INTERVAL_S:
@@ -389,10 +402,47 @@ class ModulationSourceManager:
         self._update_somatic_state(safe_dt, normalized_speed, normalized_accel)
         self._update_tension_physics(safe_dt, delta_motion)
         self._update_motion_span(primary_motion_value, current_time)
+        self._update_motion_cycle_randomizer(primary_motion_value)
 
         self.last_motion_value = primary_motion_value
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
+
+    def _update_motion_cycle_randomizer(self, current_pos: float):
+        """
+        Implements a Peak/Valley detection state machine with hysteresis.
+        Triggers a random value change only when the motion explicitly turns around.
+        """
+        hysteresis = self.config.live_params.get('motion_cycle_hysteresis', 0.02)
+        
+        # 1. State Machine
+        if self._mcr_trend_is_up:
+            # We are moving UP. Track the peak.
+            if current_pos > self._mcr_last_extreme:
+                self._mcr_last_extreme = current_pos
+            
+            # Check for turn-around (Down)
+            if current_pos < (self._mcr_last_extreme - hysteresis):
+                # Trigger Event: Turned Down
+                self._mcr_trend_is_up = False
+                self._mcr_last_extreme = current_pos # Reset extreme to current valley
+                self._mcr_current_value = random.random()
+        else:
+            # We are moving DOWN. Track the valley.
+            if current_pos < self._mcr_last_extreme:
+                self._mcr_last_extreme = current_pos
+            
+            # Check for turn-around (Up)
+            if current_pos > (self._mcr_last_extreme + hysteresis):
+                # Trigger Event: Turned Up
+                self._mcr_trend_is_up = True
+                self._mcr_last_extreme = current_pos # Reset extreme to current peak
+                self._mcr_current_value = random.random()
+
+        # 2. Output
+        self.app_context.modulation_source_store.set_source(
+            "Internal: Motion Cycle Random", self._mcr_current_value
+        )
 
     def _update_motion_span(self, current_pos: float, current_time: float):
         """

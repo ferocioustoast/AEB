@@ -191,8 +191,6 @@ class ModulationMatrixTab(QWidget):
         Returns a filtered list of modulation targets valid for the specific
         waveform type.
         """
-        # 1. Universal Parameters (Apply to almost everything)
-        # Note: 'frequency' is here because even samplers use it for playback speed.
         params = [
             'amplitude', 'gate', 'pan', 'frequency',
             'lfo_enabled', 'lfo_frequency', 'lfo_depth',
@@ -200,9 +198,7 @@ class ModulationMatrixTab(QWidget):
             'ads_attack_time', 'ads_decay_time', 'ads_sustain_level', 'adsr_release_time'
         ]
 
-        # 2. Type-Specific Parameters
         if wave_type == 'additive':
-            # Add harmonic amplitudes
             for i in range(16):
                 params.append(f"h{i+1}_amp")
         
@@ -211,15 +207,13 @@ class ModulationMatrixTab(QWidget):
                 'sampler_loop_start', 
                 'sampler_loop_end', 
                 'sampler_loop_crossfade_ms',
-                'sampler_frequency' # Specific sampler freq override
+                'sampler_frequency'
             ])
         
         elif wave_type == 'square':
             params.append('duty_cycle')
             
         elif wave_type in ['sawtooth', 'triangle']:
-            # Some advanced users might want to mod pulsing on these, 
-            # though it's less common. We'll include it for flexibility.
             params.append('duty_cycle')
 
         return sorted(params)
@@ -230,31 +224,24 @@ class ModulationMatrixTab(QWidget):
         param_combo = target_widget.findChild(QComboBox, "param_combo")
         category_name = category_combo.currentText()
         
-        # Save the current selection to restore it if still valid
         current_selection = param_combo.currentText()
         param_combo.clear()
 
         new_items = []
 
-        # --- DYNAMIC WAVEFORM LOOKUP ---
         if category_name in ['Left', 'Right', 'Ambient']:
             try:
-                # Parse "Wave 1" -> index 0
                 wave_index = int(sub_target_text.split(' ')[1]) - 1
                 channel_key = category_name.lower()
-                
-                # Fetch the actual config for this wave
                 waves = self.app_context.config.get_active_scene_dict().get('sound_waves', {}).get(channel_key, [])
                 if 0 <= wave_index < len(waves):
                     wave_type = waves[wave_index].get('type', 'sine')
                     new_items = self._get_params_for_wave_type(wave_type)
                 else:
-                    # Fallback if wave doesn't exist yet (unlikely in this UI flow)
                     new_items = self._get_params_for_wave_type('sine')
             except (IndexError, ValueError, AttributeError):
                 new_items = self._get_params_for_wave_type('sine')
 
-        # --- STANDARD CATEGORIES ---
         elif category_name == 'Master':
             new_items = ['left_amplitude', 'right_amplitude', 'ambient_amplitude',
                        'ambient_panning_link_enabled', 'stereo_width', 'pan_offset',
@@ -287,7 +274,7 @@ class ModulationMatrixTab(QWidget):
                 'internal_drift_speed', 'internal_drift_octaves',
                 'env_follower_attack_ms', 'env_follower_release_ms',
                 'motion_norm_window_s', 'motion_speed_floor', 'motion_accel_floor',
-                'motion_jolt_floor', 'velocity_smoothing',
+                'motion_jolt_floor', 'motion_cycle_hysteresis', 'velocity_smoothing',
                 'vas_vl1_end_zone_size', 'vas_vr0_stiffness', 'vas_vr0_damping',
                 'vas_vl1_stiffness', 'vas_vl1_damping', 'vas_vv0_stiffness',
                 'vas_vv0_damping',
@@ -295,10 +282,9 @@ class ModulationMatrixTab(QWidget):
                 'somatic_excitation_cooldown_s', 'somatic_stress_attack_s',
                 'somatic_stress_release_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
-                'impulse_input_gain', 'input_inertia'
+                'impulse_gain_spinbox', 'input_inertia'
             ]
         
-        # --- Motion Feel (Context Aware) ---
         elif category_name == 'MotionFeel':
             axis = sub_target_text
             motion_feel_params = {'enabled'}
@@ -313,10 +299,8 @@ class ModulationMatrixTab(QWidget):
             elif axis == 'VA0': motion_feel_params.update(['muffle_hz', 'suction_boost'])
             new_items = sorted(list(motion_feel_params))
 
-        # Update the Combo Box
         param_combo.addItems(new_items)
         
-        # Restore selection if it still exists in the new list, otherwise default
         if current_selection in new_items:
             param_combo.setCurrentText(current_selection)
         elif new_items:
@@ -334,7 +318,6 @@ class ModulationMatrixTab(QWidget):
         sub_target_stack.setObjectName("sub_target_stack")
         param_combo.setObjectName("param_combo")
         
-        # Tooltips for target selection
         category_combo.setToolTip("Select the system (e.g., Left Channel, LFO, Master).")
         sub_target_stack.setToolTip("Select the specific instance (e.g., Wave 1, LFO 'Pulse').")
         param_combo.setToolTip("Select the parameter to modulate (e.g., Frequency, Amplitude).")
@@ -426,7 +409,7 @@ class ModulationMatrixTab(QWidget):
             sub = sub_stack.widget(0).currentText()
             if all([category, sub, param]): new_target_string = f"System LFO.{sub}.{param}"
         elif category == 'Scene':
-            sub = sub_stack.widget(0).currentText()
+            sub = sub_target_stack.widget(0).currentText()
             if all([category, sub, param]):
                 try: new_target_string = f"Scene.{param}.{int(sub.split(' ')[-1])}"
                 except (ValueError, IndexError): return
@@ -497,7 +480,7 @@ class ModulationMatrixTab(QWidget):
                 cat = parts[0].capitalize()
                 if cat in ['Left', 'Right', 'Ambient']:
                     sub, param = f"Wave {int(parts[1])+1}", parts[2]
-                elif cat in ['Master', 'Ramping', 'Loop', 'Source Tuning', 'Zonal']:
+                elif cat in ['Master', 'Ramping', 'Source Tuning', 'Loop', 'Zonal']:
                     sub, param = '', parts[1]
             except (ValueError, IndexError):
                 pass
@@ -574,7 +557,7 @@ class ModulationMatrixTab(QWidget):
         spinbox.setToolTip("A fixed value for the amount.\nRight-click to switch to using the source's value directly.")
 
         if rule.get('mode') == 'set' and 'amount' not in rule:
-            amount_stack.setCurrentIndex(3) # "(Source Value)" label
+            amount_stack.setCurrentIndex(3)
             return
 
         amount = rule.get('amount', 1.0)
@@ -730,27 +713,16 @@ class ModulationMatrixTab(QWidget):
 
     def _get_available_mod_params(self) -> list[str]:
         """
-        Returns a list of all available modulation target parameters.
-        Explicitly excludes string parameters and complex types that cannot
-        be modulated safely in real-time.
+        Returns a list of all available modulation target parameters for waves.
         """
-        # Define parameters to exclude from the target list
         excluded_params = [
-            'type',                 # Safety: Synthesis algorithm change
-            'muted',                # UI state, use 'gate' or 'amplitude' instead
-            'soloed',               # UI state
-            'harmonics',            # Array type, handled via hX_amp virtual targets
-            'comment',              # Metadata
-            'additive_waveform',    # String type
-            'sampler_filepath',     # Safety: Blocking I/O and Type mismatch
-            'sampler_loop_mode'     # String type
+            'type', 'muted', 'soloed', 'harmonics', 'comment', 
+            'additive_waveform', 'sampler_filepath', 'sampler_loop_mode'
         ]
 
-        # Get base keys from the default configuration
         params = [k for k in DEFAULT_SETTINGS['sound_waves']['left'][0].keys()
                   if k not in excluded_params]
 
-        # Add virtual parameters
         params.insert(0, "gate")
         for i in range(16):
             params.append(f"h{i+1}_amp")

@@ -129,6 +129,7 @@ class SourceTuningTab(QWidget):
         self.input_inertia_spinbox.setValue(cfg.get('input_inertia'))
         self.motion_direction_slew_spinbox.setValue(cfg.get('motion_direction_slew_s'))
         self.motion_direction_deadzone_spinbox.setValue(cfg.get('motion_direction_deadzone'))
+        self.motion_cycle_hysteresis_spinbox.setValue(cfg.get('motion_cycle_hysteresis'))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.setValue(cfg.get('motion_jolt_floor'))
@@ -189,6 +190,7 @@ class SourceTuningTab(QWidget):
         self.input_inertia_spinbox.valueChanged.connect(lambda v: mwu('input_inertia', v))
         self.motion_direction_slew_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_slew_s', v))
         self.motion_direction_deadzone_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_deadzone', v))
+        self.motion_cycle_hysteresis_spinbox.valueChanged.connect(lambda v: mwu('motion_cycle_hysteresis', v))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_jolt_floor', v))
@@ -402,6 +404,14 @@ class SourceTuningTab(QWidget):
             "Prevents the value from getting stuck high during pauses."
         )
         add_row_with_tooltip("Motion Span Decay:", self.motion_span_decay_spinbox)
+
+        self.motion_cycle_hysteresis_spinbox = QDoubleSpinBox(decimals=3, minimum=0.001, maximum=0.2, singleStep=0.001)
+        self.motion_cycle_hysteresis_spinbox.setToolTip(
+            "Motion Cycle Hysteresis: The distance (0.0-1.0) the device must travel\n"
+            "in the opposite direction to register a 'Turnaround' event.\n"
+            "Higher values filter out jitter/noise but delay the trigger."
+        )
+        add_row_with_tooltip("Motion Cycle Hysteresis:", self.motion_cycle_hysteresis_spinbox)
 
         self.input_inertia_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.99, singleStep=0.05)
         self.input_inertia_spinbox.setToolTip(

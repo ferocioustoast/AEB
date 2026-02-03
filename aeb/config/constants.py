@@ -97,6 +97,7 @@ DEFAULT_SETTINGS: dict = {
 
         # Geometric Motion Analysis
         "Internal: Motion Span": 0.0,
+        "Internal: Motion Cycle Random": 0.5,
 
         # Drift (Organic/Pink Noise)
         "Internal: Drift": 0.0,
@@ -220,6 +221,7 @@ DEFAULT_SETTINGS: dict = {
     'motion_accel_floor': 50.0,
     'motion_jolt_floor': 2500.0,
     'motion_span_decay_s': 3.0,
+    'motion_cycle_hysteresis': 0.02,
     'velocity_smoothing': 0.1,
     'input_inertia': 0.15,
     'motion_direction_slew_s': 0.1,
