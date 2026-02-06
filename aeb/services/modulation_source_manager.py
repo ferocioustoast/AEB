@@ -128,7 +128,8 @@ class ModulationSourceManager:
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
             "Internal: Transient Impulse", "Internal: Drift",
-            "Internal: Motion Span", "Internal: Motion Cycle Random"
+            "Internal: Motion Span", "Internal: Motion Cycle Random",
+            "Internal: Differential Potential"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -369,6 +370,15 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Speed", normalized_speed)
         store.set_source("Primary Motion: Acceleration", normalized_accel)
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
+
+        # --- Differential Potential (Edge Detection) ---
+        # Calculates the spread between Left and Right channels.
+        # 0.0 = Center (Equal), 1.0 = Edge (Hard Panned)
+        l_vol = self.app_context.live_motor_volume_left
+        r_vol = self.app_context.live_motor_volume_right
+        diff_potential = abs(l_vol - r_vol)
+        store.set_source("Internal: Differential Potential", np.clip(diff_potential, 0.0, 1.0))
+        # -----------------------------------------------
 
         # --- Directional Logic (Anisotropic Haptics) ---
         dir_slew_s = max(live.get('motion_direction_slew_s', 0.1), 0.01)

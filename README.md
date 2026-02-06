@@ -22,7 +22,7 @@ This program generates audio signals intended to control high-voltage e-stim har
 *   **Organic Drift Synthesis:** Prevents sensory habituation using a generative fractal engine that produces smooth, non-repeating motion (like wind or tides).
 
 ### 🎮 Intelligence & Control
-*   **Deep Modulation Matrix:** Achieve total creative control by routing any source (Gamepad, T-Code, LFOs, Physics) to nearly any parameter in the engine.
+*   **Deep Modulation Matrix:** Achieve total creative control by routing any source (Gamepad, T-Code, LFOs, Physics, Positional Analysis) to nearly any parameter in the engine.
 *   **Rhythmic Screen Flow:** Automatically syncs stimulation tempo and intensity to on-screen video content using real-time motion energy analysis.
 *   **Graphical Motion Mapping:** Replace simple crossfades with custom **Amplitude Curves**. Control exactly how every wave responds to its position in 3D space.
 
