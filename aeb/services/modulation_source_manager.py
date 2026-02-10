@@ -84,6 +84,10 @@ class ModulationSourceManager:
         self.impulse_pos: float = 0.0
         self.impulse_vel: float = 0.0
 
+        # Kinetic Impact Physics State (Collision)
+        self.kinetic_impact_level: float = 0.0
+        self._was_in_impact_zone: bool = False
+
         # Somatic State Engine Variables
         self.excitation_level: float = 0.0
         self.stress_level: float = 0.0
@@ -91,12 +95,12 @@ class ModulationSourceManager:
 
         # Motion Span State (Peak-to-Peak)
         self._span_min_tracker: float = 0.0
-        self._span_max_tracker: float = 0.0 # Fixed: Initialize to 0 to prevent startup spike
+        self._span_max_tracker: float = 0.0
         self._span_is_moving_up: bool = True
         self._span_target_value: float = 0.0
         self._span_current_smoothed: float = 0.0
         self._span_last_turnaround_time: float = 0.0
-        self._span_initialized: bool = False # New flag for first-frame setup
+        self._span_initialized: bool = False
 
         # Drift Generator State
         self.drift_time = random.uniform(0.0, 256.0)
@@ -127,9 +131,9 @@ class ModulationSourceManager:
             "TCode: V-R0", "TCode: V-L1",
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
-            "Internal: Transient Impulse", "Internal: Drift",
-            "Internal: Motion Span", "Internal: Motion Cycle Random",
-            "Internal: Differential Potential"
+            "Internal: Transient Impulse", "Internal: Kinetic Impact",
+            "Internal: Drift", "Internal: Motion Span",
+            "Internal: Motion Cycle Random", "Internal: Differential Potential"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -163,6 +167,8 @@ class ModulationSourceManager:
         self.tension_offset = 0.0
         self.impulse_pos = 0.0
         self.impulse_vel = 0.0
+        self.kinetic_impact_level = 0.0
+        self._was_in_impact_zone = False
         self.drift_time = random.uniform(0.0, 256.0)
         
         # Reset Motion Span
@@ -297,11 +303,8 @@ class ModulationSourceManager:
             self._reset_motion_sources()
             self._was_motion_active = False
             self.last_motion_value = primary_motion_value
-            # Reset span state when inactive so it re-initializes on resume
             self._span_initialized = False 
-            # Reset direction target to neutral
             self._direction_target = 0.5
-            # Reset MCR initialization
             self._mcr_last_extreme = 0.0
             return
 
@@ -313,10 +316,11 @@ class ModulationSourceManager:
             self.tension_offset = 0.0
             self.impulse_vel = 0.0
             self.impulse_pos = 0.0
+            self.kinetic_impact_level = 0.0
             self.smoothed_velocity = 0.0
             self._span_target_value = 0.0
             self._span_current_smoothed = 0.0
-            self._mcr_last_extreme = primary_motion_value # Initialize MCR anchor
+            self._mcr_last_extreme = primary_motion_value
             self._was_motion_active = True
 
         if current_time - self._last_cache_update_time > self.CACHE_UPDATE_INTERVAL_S:
@@ -372,8 +376,6 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
 
         # --- Differential Potential (Edge Detection) ---
-        # Calculates the spread between Left and Right channels.
-        # 0.0 = Center (Equal), 1.0 = Edge (Hard Panned)
         l_vol = self.app_context.live_motor_volume_left
         r_vol = self.app_context.live_motor_volume_right
         diff_potential = abs(l_vol - r_vol)
@@ -384,14 +386,11 @@ class ModulationSourceManager:
         dir_slew_s = max(live.get('motion_direction_slew_s', 0.1), 0.01)
         dir_deadzone = live.get('motion_direction_deadzone', 0.001)
 
-        # 1. Hysteresis / Latch
         if raw_velocity > dir_deadzone:
             self._direction_target = 1.0
         elif raw_velocity < -dir_deadzone:
             self._direction_target = 0.0
-        # Else: hold previous target
 
-        # 2. Slew Limiting
         diff = self._direction_target - self._direction_current_val
         max_step = (1.0 / dir_slew_s) * safe_dt
         
@@ -400,10 +399,35 @@ class ModulationSourceManager:
         else:
             self._direction_current_val += math.copysign(max_step, diff)
 
-        # 3. Output
         store.set_source("Primary Motion: Direction (Uni)", self._direction_current_val)
         store.set_source("Primary Motion: Direction (Bi)", (self._direction_current_val * 2.0) - 1.0)
         # -----------------------------------------------
+
+        # --- Kinetic Impact Logic (Collision Detection) ---
+        impact_threshold = live.get('impact_threshold', 0.2)
+        impact_decay = live.get('impact_decay_s', 0.25)
+        zone_size = live.get('impact_zone_size', 0.05)
+
+        # Decay toward zero
+        if self.kinetic_impact_level > 0.0:
+            decay_rate = 1.0 / max(impact_decay, 0.01)
+            self.kinetic_impact_level = max(0.0, self.kinetic_impact_level - decay_rate * safe_dt)
+
+        # Edge Detection
+        hit_bottom = (primary_motion_value < zone_size) and (raw_velocity < -impact_threshold)
+        hit_top = (primary_motion_value > (1.0 - zone_size)) and (raw_velocity > impact_threshold)
+        is_impacting = hit_bottom or hit_top
+
+        if is_impacting and not self._was_in_impact_zone:
+            # Trigger impulse on entering the impact state
+            self.kinetic_impact_level = 1.0
+            self._was_in_impact_zone = True
+        elif not is_impacting:
+            # Reset state when leaving the impact conditions
+            self._was_in_impact_zone = False
+        
+        store.set_source("Internal: Kinetic Impact", self.kinetic_impact_level)
+        # --------------------------------------------------
 
         self._synthesize_virtual_axes(
             primary_motion_value, normalized_speed, acceleration, jolt, 

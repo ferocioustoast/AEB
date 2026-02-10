@@ -282,7 +282,8 @@ class ModulationMatrixTab(QWidget):
                 'somatic_excitation_cooldown_s', 'somatic_stress_attack_s',
                 'somatic_stress_release_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
-                'impulse_gain_spinbox', 'input_inertia'
+                'impulse_gain_spinbox', 'input_inertia',
+                'impact_threshold', 'impact_decay_s', 'impact_zone_size'
             ]
         
         elif category_name == 'MotionFeel':

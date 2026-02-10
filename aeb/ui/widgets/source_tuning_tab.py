@@ -74,6 +74,7 @@ class SourceTuningTab(QWidget):
             "Primary Motion Dynamics": self._create_motion_dynamics_group(),
             "Virtual Axis Tuning": self._create_virtual_axis_tuning_group(),
             "Transient Impulse (Ripple)": self._create_transient_impulse_group(),
+            "Kinetic Impact (Collision)": self._create_kinetic_impact_group(),
         }
         for name, panel in panels.items():
             self.category_list.addItem(name)
@@ -151,6 +152,11 @@ class SourceTuningTab(QWidget):
         self.impulse_damping_spinbox.setValue(cfg.get('impulse_damping'))
         self.impulse_gain_spinbox.setValue(cfg.get('impulse_input_gain'))
 
+        # Kinetic Impact Physics
+        self.impact_threshold_spinbox.setValue(cfg.get('impact_threshold'))
+        self.impact_decay_spinbox.setValue(cfg.get('impact_decay_s'))
+        self.impact_zone_spinbox.setValue(cfg.get('impact_zone_size'))
+
     def _connect_signals(self):
         """Connects signals for all widgets."""
         self.category_list.currentRowChanged.connect(self.panel_stack.setCurrentIndex)
@@ -211,6 +217,11 @@ class SourceTuningTab(QWidget):
         self.impulse_spring_spinbox.valueChanged.connect(lambda v: mwu('impulse_spring', v))
         self.impulse_damping_spinbox.valueChanged.connect(lambda v: mwu('impulse_damping', v))
         self.impulse_gain_spinbox.valueChanged.connect(lambda v: mwu('impulse_input_gain', v))
+
+        # Kinetic Impact
+        self.impact_threshold_spinbox.valueChanged.connect(lambda v: mwu('impact_threshold', v))
+        self.impact_decay_spinbox.valueChanged.connect(lambda v: mwu('impact_decay_s', v))
+        self.impact_zone_spinbox.valueChanged.connect(lambda v: mwu('impact_zone_size', v))
 
     def _create_somatic_state_engine_group(self) -> QWidget:
         """Creates the settings panel for the Somatic State Engine."""
@@ -507,4 +518,23 @@ class SourceTuningTab(QWidget):
         self.impulse_gain_spinbox.setToolTip("Input Gain. How sensitive the system is to Jolt/Impact.")
         layout.addRow("Input Gain:", self.impulse_gain_spinbox)
         
+        return group
+
+    def _create_kinetic_impact_group(self) -> QWidget:
+        """Creates the settings panel for Kinetic Impact (Collision) physics."""
+        group = QGroupBox("Transient Impact (Collision)")
+        layout = QFormLayout(group)
+
+        self.impact_threshold_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=1.0, singleStep=0.05)
+        self.impact_threshold_spinbox.setToolTip("Minimum velocity required to trigger a collision thud.")
+        layout.addRow("Velocity Threshold:", self.impact_threshold_spinbox)
+
+        self.impact_decay_spinbox = QDoubleSpinBox(decimals=2, minimum=0.01, maximum=2.0, singleStep=0.05, suffix=" s")
+        self.impact_decay_spinbox.setToolTip("How fast the impact sensation fades out.")
+        layout.addRow("Decay Time:", self.impact_decay_spinbox)
+
+        self.impact_zone_spinbox = QDoubleSpinBox(decimals=3, minimum=0.001, maximum=0.2, singleStep=0.005)
+        self.impact_zone_spinbox.setToolTip("The size of the 'wall' at the top and bottom of the motion range.")
+        layout.addRow("Zone Size:", self.impact_zone_spinbox)
+
         return group

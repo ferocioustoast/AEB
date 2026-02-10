@@ -105,6 +105,9 @@ DEFAULT_SETTINGS: dict = {
 
         # Transient Impulse (Virtual Ripple Physics)
         "Internal: Transient Impulse": 0.0,
+
+        # Kinetic Impact (Collision Physics)
+        "Internal: Kinetic Impact": 0.0,
         
         "Primary Motion: Position": 0.0,
         "Primary Motion: Velocity": 0.0,
@@ -244,6 +247,11 @@ DEFAULT_SETTINGS: dict = {
     'impulse_spring': 50.0,
     'impulse_damping': 2.0,
     'impulse_input_gain': 1.0,
+
+    # Kinetic Impact (Collision Physics)
+    'impact_threshold': 0.2,
+    'impact_decay_s': 0.25,
+    'impact_zone_size': 0.05,
 
     # Motion Feel
     'motion_feel_L1_enabled': False,
