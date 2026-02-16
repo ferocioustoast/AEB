@@ -44,12 +44,20 @@ class ModulationSourceManager:
     """
     CACHE_UPDATE_INTERVAL_S = 0.25  # 4 Hz
 
-    def __init__(self, app_context: 'AppContext', initial_config: 'EngineConfig'):
+    def __init__(self, app_context: 'AppContext', initial_config: 'EngineConfig', update_rate_hz: float = 60.0):
         """
         Initializes the manager and its internal state.
+        
+        Args:
+            app_context: The application context.
+            initial_config: The engine configuration.
+            update_rate_hz: The expected update frequency of the engine in Hz.
+                            Used to correctly size history buffers.
         """
         self.app_context = app_context
         self.config = initial_config
+        self.update_rate_hz = update_rate_hz
+        
         self.last_motion_value: float = 0.0
         self.last_motion_speed: float = 0.0
         self.last_motion_accel: float = 0.0
@@ -110,8 +118,10 @@ class ModulationSourceManager:
         random.shuffle(self._perm)
         self._perm += self._perm
 
+        # CORRECTED: Dynamic sizing based on actual update rate
         history_len = int(
-            self.config.live_params.get('motion_norm_window_s', 8.0) * 60)
+            self.config.live_params.get('motion_norm_window_s', 8.0) * self.update_rate_hz
+        )
         self.motion_speed_history = collections.deque(
             maxlen=max(1, history_len))
         self.motion_accel_history = collections.deque(
@@ -133,7 +143,8 @@ class ModulationSourceManager:
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
             "Internal: Transient Impulse", "Internal: Kinetic Impact",
             "Internal: Drift", "Internal: Motion Span",
-            "Internal: Motion Cycle Random", "Internal: Differential Potential"
+            "Internal: Motion Cycle Random", "Internal: Differential Potential",
+            "Internal: Spatial Texture"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -211,7 +222,8 @@ class ModulationSourceManager:
 
     def resize_history_buffers(self, new_window_seconds: float):
         """Resizes deques for motion dynamics."""
-        new_maxlen = int(new_window_seconds * 60)
+        # CORRECTED: Use dynamic rate instead of hardcoded 60
+        new_maxlen = int(new_window_seconds * self.update_rate_hz)
         if new_maxlen <= 0:
             new_maxlen = 1
         self.motion_speed_history = collections.deque(
@@ -433,6 +445,7 @@ class ModulationSourceManager:
             primary_motion_value, normalized_speed, acceleration, jolt, 
             raw_velocity, safe_dt
         )
+        self._update_spatial_texture(primary_motion_value, raw_velocity)
         self._update_somatic_state(safe_dt, normalized_speed, normalized_accel)
         self._update_tension_physics(safe_dt, delta_motion)
         self._update_motion_span(primary_motion_value, current_time)
@@ -441,6 +454,70 @@ class ModulationSourceManager:
         self.last_motion_value = primary_motion_value
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
+
+    def _update_spatial_texture(self, position: float, raw_velocity: float):
+        """
+        Calculates the 'Internal: Spatial Texture' source.
+        This source oscillates based on distance traveled, not time.
+        Amplitude fades to 0 as the frequency approaches the new engine limit (50Hz).
+        """
+        live = self.config.live_params
+        density = live.get('spatial_texture_density', 20.0)
+        waveform = live.get('spatial_texture_waveform', 'sine')
+        
+        # Calculate instantaneous texture frequency (Hz)
+        texture_freq = abs(raw_velocity) * density
+        
+        # Safety Fade Logic (Anti-Aliasing)
+        # Nyquist limit of new 100Hz engine is 50Hz.
+        # We fade out as we approach Nyquist to prevent erratic aliasing.
+        fade_start_hz = 40.0
+        fade_end_hz = 60.0 # Relaxed slightly past Nyquist to allow natural alias-blur
+        
+        if texture_freq >= fade_end_hz:
+            fade_factor = 0.0
+        elif texture_freq <= fade_start_hz:
+            fade_factor = 1.0
+        else:
+            # Linear fade from 1.0 to 0.0
+            fade_factor = 1.0 - ((texture_freq - fade_start_hz) / (fade_end_hz - fade_start_hz))
+            
+        if fade_factor <= 0.001:
+            self.app_context.modulation_source_store.set_source(
+                "Internal: Spatial Texture", 0.0
+            )
+            return
+
+        # Calculate Phase (Distance-based)
+        # We assume position is 0.0 to 1.0.
+        # Phase cycles = Position * Density.
+        # We don't need continuous phase accumulation because it's spatial.
+        # Position 0.5 is always Phase 0.5 * Density.
+        phase_normalized = (position * density) % 1.0
+        
+        raw_val = 0.0
+        if waveform == 'sine':
+            # Unipolar Sine: (sin(2pi * p) + 1) / 2
+            raw_val = (math.sin(phase_normalized * 2 * math.pi) + 1.0) / 2.0
+        elif waveform == 'triangle':
+            # Unipolar Triangle: 0 -> 1 -> 0
+            # 2 * phase if < 0.5 else 2 * (1 - phase)
+            if phase_normalized < 0.5:
+                raw_val = 2.0 * phase_normalized
+            else:
+                raw_val = 2.0 * (1.0 - phase_normalized)
+        elif waveform == 'sawtooth':
+            # Unipolar Sawtooth: 0 -> 1
+            raw_val = phase_normalized
+        elif waveform == 'square':
+            # Unipolar Square: 1 if < 0.5 else 0
+            raw_val = 1.0 if phase_normalized < 0.5 else 0.0
+            
+        final_val = raw_val * fade_factor
+        
+        self.app_context.modulation_source_store.set_source(
+            "Internal: Spatial Texture", final_val
+        )
 
     def _update_motion_cycle_randomizer(self, current_pos: float):
         """

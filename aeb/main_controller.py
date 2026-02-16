@@ -607,7 +607,7 @@ class MainController(QObject):
                 "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
                 "Internal: Motion Span", "Internal: Transient Impulse",
                 "Internal: Motion Cycle Random", "Internal: Differential Potential",
-                "Internal: Kinetic Impact"
+                "Internal: Kinetic Impact", "Internal: Spatial Texture"
             )
             for rule in self.app_context.config.get('modulation_matrix', []):
                 if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):

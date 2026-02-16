@@ -104,7 +104,7 @@ For maximum stability and to prevent conflicts with other Python packages, it is
 *   **Servers & TCode:** Enable and configure the WSDM client, UDP server, and Virtual X360 Controller.
 *   **Live Sync:** Controls for real-time synchronization. **Screen Flow** performs rhythmic motion analysis on video content, while **Audio Input Analysis** creates sources from system audio.
 *   **Motion Feel:** The "easy mode" for adding intuitive effects based on both real and synthesized T-Code axes.
-*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **Signal Safety & Integrity**, **System LFOs**, **Drift**, **Thermodynamics**, **Viscoelastic Physics**, **Inertial Mass**, **Pneumatics**, **Kinetic Impact**, and **Primary Motion Dynamics**.
+*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **Signal Safety & Integrity**, **System LFOs**, **Drift**, **Spatial Texture**, **Thermodynamics**, **Viscoelastic Physics**, **Inertial Mass**, **Pneumatics**, **Kinetic Impact**, and **Primary Motion Dynamics**.
 *   **Modulation Matrix:** The "expert mode" for creating custom, conditional rules to modulate any parameter from any source.
 *   **Volume Ramping:** Fine-tune the automatic fade-in/fade-out behavior.
 *   **Program Launcher:** Configure external programs to launch automatically.

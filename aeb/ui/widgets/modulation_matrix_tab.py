@@ -272,6 +272,7 @@ class ModulationMatrixTab(QWidget):
             new_items = [
                 'internal_time_period_s', 'internal_random_rate_hz',
                 'internal_drift_speed', 'internal_drift_octaves',
+                'spatial_texture_density', 'spatial_texture_waveform',
                 'env_follower_attack_ms', 'env_follower_release_ms',
                 'motion_norm_window_s', 'motion_speed_floor', 'motion_accel_floor',
                 'motion_jolt_floor', 'motion_cycle_hysteresis', 'velocity_smoothing',
@@ -586,6 +587,11 @@ class ModulationMatrixTab(QWidget):
             amount_stack.setCurrentIndex(1)
         elif state_op == 'toggle':
             amount_stack.setCurrentIndex(2)
+        elif target == 'Source Tuning.spatial_texture_waveform':
+            with self.main_window._block_signals(combo):
+                combo.clear(); combo.addItems(['sine', 'triangle', 'square', 'sawtooth'])
+                combo.setCurrentText(str(amount))
+            amount_stack.setCurrentIndex(1)
         else:
             with self.main_window._block_signals(spinbox):
                 try: spinbox.setValue(float(amount))
@@ -608,7 +614,7 @@ class ModulationMatrixTab(QWidget):
             'Loop.randomize_loop_speed', 'Loop.randomize_loop_range'
         ]
         is_bool_target = any(target.endswith(p) for p in ['_enabled', '.enabled']) or target in bool_targets
-        is_string_target = target in ['Master.panning_law', 'Loop.motion_type']
+        is_string_target = target in ['Master.panning_law', 'Loop.motion_type', 'Source Tuning.spatial_texture_waveform']
 
         if is_bool_target or is_string_target:
             with self.main_window._block_signals(mode_widget):

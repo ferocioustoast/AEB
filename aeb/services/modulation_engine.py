@@ -56,13 +56,19 @@ class ModulationEngine:
         self.controller = controller
         self.command_queue = command_queue
         self.config = EngineConfig()
-        self.mod_source_manager = ModulationSourceManager(app_context, self.config)
+        
+        # We pass this rate to the manager so it can size buffers correctly.
+        self.update_rate_hz = 100.0
+        self.update_interval_s = 1.0 / self.update_rate_hz
+        
+        self.mod_source_manager = ModulationSourceManager(
+            app_context, self.config, self.update_rate_hz
+        )
         self.transition_manager = SceneTransitionManager(
             app_context, self.controller)
         self.last_update_time: float = time.perf_counter()
         self.is_running: bool = False
         self._stop_event = threading.Event()
-        self.update_interval_s = 1.0 / 60.0
 
         self._activation_levels: dict[int, float] = {}
         self._effective_matrix: list = []
@@ -73,7 +79,8 @@ class ModulationEngine:
     def run(self):
         """The main run loop for the modulation engine thread."""
         self.app_context.signals.log_message.emit(
-            "Central Modulation Engine thread started.")
+            f"Central Modulation Engine thread started ({self.update_rate_hz:.0f} Hz)."
+        )
         self.is_running = True
         self.last_update_time = time.perf_counter()
         while not self._stop_event.is_set():
@@ -396,7 +403,7 @@ class ModulationEngine:
         ctx = self.app_context
         live_params_update = {}
 
-        source_tuning_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS if k.startswith(('internal_', 'env_', 'motion_', 'intensity_', 'vas_', 'somatic_', 'impulse_'))}
+        source_tuning_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS if k.startswith(('internal_', 'spatial_', 'env_', 'motion_', 'intensity_', 'vas_', 'somatic_', 'impulse_'))}
         source_tuning_eff, _ = apply_modulations_to_parameters(ctx, "Source Tuning", source_tuning_base, activation_levels, unified_sources, mod_matrix_override=effective_matrix)
         live_params_update.update(source_tuning_eff)
 

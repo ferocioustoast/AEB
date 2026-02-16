@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import (
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QFrame,
     QListWidget, QStackedWidget, QSplitter, QWidget, QLabel, QSpinBox,
-    QScrollArea
+    QScrollArea, QComboBox
 )
 
 from aeb.ui.widgets.panels.system_lfos_panel import SystemLfosPanel
@@ -70,6 +70,7 @@ class SourceTuningTab(QWidget):
             "Signal Safety & Integrity": self._create_signal_fortress_group(),
             "Somatic State Engine": self._create_somatic_state_engine_group(),
             "Drift & Internal Generative": self._create_drift_group(),
+            "Spatial Texture (Distance-Based)": self._create_spatial_texture_group(),
             "Viscoelastic Skin Physics": self._create_viscoelastic_physics_group(),
             "Primary Motion Dynamics": self._create_motion_dynamics_group(),
             "Virtual Axis Tuning": self._create_virtual_axis_tuning_group(),
@@ -111,6 +112,10 @@ class SourceTuningTab(QWidget):
         # Drift
         self.drift_speed_spinbox.setValue(cfg.get('internal_drift_speed'))
         self.drift_octaves_spinbox.setValue(cfg.get('internal_drift_octaves'))
+        
+        # Spatial Texture
+        self.st_density_spinbox.setValue(cfg.get('spatial_texture_density', 20.0))
+        self.st_waveform_combo.setCurrentText(cfg.get('spatial_texture_waveform', 'sine'))
 
         # Viscoelastic Physics
         self.tension_limit_spinbox.setValue(cfg.get('internal_tension_limit'))
@@ -177,6 +182,10 @@ class SourceTuningTab(QWidget):
         # Drift
         self.drift_speed_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_speed', v))
         self.drift_octaves_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_octaves', v))
+        
+        # Spatial Texture
+        self.st_density_spinbox.valueChanged.connect(lambda v: mwu('spatial_texture_density', v))
+        self.st_waveform_combo.currentTextChanged.connect(lambda v: mwu('spatial_texture_waveform', v))
 
         # Viscoelastic Physics
         self.tension_limit_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_limit', v))
@@ -317,6 +326,32 @@ class SourceTuningTab(QWidget):
         self.drift_octaves_spinbox = QSpinBox(minimum=1, maximum=5)
         self.drift_octaves_spinbox.setToolTip("Fractal Complexity/Roughness.\n1 = Smooth sine-like motion.\n4 = Complex, gritty, natural motion.")
         layout.addRow("Octaves (Complexity):", self.drift_octaves_spinbox)
+        
+        return group
+        
+    def _create_spatial_texture_group(self) -> QWidget:
+        """Creates the settings panel for the Spatial Texture generator."""
+        group = QGroupBox("Internal: Spatial Texture (Distance-Based)")
+        layout = QFormLayout(group)
+        
+        layout.addRow(QLabel(
+            "Spatial Texture oscillates based on Distance Traveled, not Time.\n"
+            "It creates physical 'ridges' or 'bumps' that you can scrub over.\n"
+            "If you stop moving, the texture stops pulsing."
+        ))
+
+        self.st_density_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=100.0, singleStep=1.0)
+        self.st_density_spinbox.setToolTip(
+            "Density: The number of 'bumps' or cycles across the full travel length.\n"
+            "Higher values = finer texture (sandpaper).\n"
+            "Lower values = larger bumps (ribs)."
+        )
+        layout.addRow("Texture Density:", self.st_density_spinbox)
+        
+        self.st_waveform_combo = QComboBox()
+        self.st_waveform_combo.addItems(['sine', 'triangle', 'square', 'sawtooth'])
+        self.st_waveform_combo.setToolTip("The shape of the virtual ridges.")
+        layout.addRow("Texture Shape:", self.st_waveform_combo)
         
         return group
 

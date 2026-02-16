@@ -102,6 +102,9 @@ DEFAULT_SETTINGS: dict = {
 
         # Drift (Organic/Pink Noise)
         "Internal: Drift": 0.0,
+        
+        # Spatial Texture (Distance-Based)
+        "Internal: Spatial Texture": 0.0,
 
         # Transient Impulse (Virtual Ripple Physics)
         "Internal: Transient Impulse": 0.0,
@@ -196,6 +199,10 @@ DEFAULT_SETTINGS: dict = {
     # Drift Generator (Organic Motion)
     'internal_drift_speed': 0.5,
     'internal_drift_octaves': 2,
+    
+    # Spatial Texture
+    'spatial_texture_density': 20.0,
+    'spatial_texture_waveform': 'sine',
 
     # Live Sync: Screen Flow
     'screen_flow_enabled_on_startup': False,
