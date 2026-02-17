@@ -589,7 +589,7 @@ class ModulationMatrixTab(QWidget):
             amount_stack.setCurrentIndex(2)
         elif target == 'Source Tuning.spatial_texture_waveform':
             with self.main_window._block_signals(combo):
-                combo.clear(); combo.addItems(['sine', 'triangle', 'square', 'sawtooth'])
+                combo.clear(); combo.addItems(['sine', 'triangle', 'square', 'sawtooth', 'custom'])
                 combo.setCurrentText(str(amount))
             amount_stack.setCurrentIndex(1)
         else:

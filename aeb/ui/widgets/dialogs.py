@@ -420,47 +420,59 @@ class SpatialMapperDialog(QDialog):
                         return
 
 
-class PositionalAmbientMapperDialog(QDialog):
-    """A modal dialog for graphically editing the positional ambient mapping curve."""
+class GenericCurveEditorDialog(QDialog):
+    """
+    A generic modal dialog for graphically editing a single data curve.
+    Used for features like the Positional Ambient Mapper and Custom Texture Map.
+    """
 
-    def __init__(self, initial_mapping_data: Optional[List], parent=None):
+    def __init__(self, initial_mapping_data: Optional[List],
+                 title: str = "Curve Editor",
+                 x_label: str = "X Axis",
+                 y_label: str = "Y Axis",
+                 parent=None):
         """
-        Initializes the PositionalAmbientMapperDialog.
+        Initializes the GenericCurveEditorDialog.
 
         Args:
-            initial_mapping_data: The current `positional_ambient_mapping` data from config.
+            initial_mapping_data: A list of [x, y] points.
+            title: Window title.
+            x_label: Label for the X axis.
+            y_label: Label for the Y axis.
             parent: The parent widget.
         """
         super().__init__(parent)
-        self.setWindowTitle("Positional Ambient Volume Mapper")
+        self.setWindowTitle(title)
         self.setMinimumSize(800, 600)
 
         self.working_data = copy.deepcopy(initial_mapping_data)
-        if self.working_data is None:
-            self.working_data = self._generate_preset_data('bypass')
+        if self.working_data is None or not isinstance(self.working_data, list):
+            self.working_data = self._generate_preset_data('default')
 
         main_layout = QVBoxLayout(self)
-        self._create_mapper_group(main_layout)
+        self._create_mapper_group(main_layout, x_label, y_label)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         main_layout.addWidget(buttons)
+        
         self.curve_roi.sigRegionChanged.connect(self._on_roi_changed)
+        self.mapper_plot.scene().sigMouseClicked.connect(self._on_plot_double_clicked)
         self._update_plot_from_data()
 
     def get_final_mapping_data(self) -> List:
         """Returns the edited mapping data upon dialog acceptance."""
         return self.working_data
 
-    def _create_mapper_group(self, main_layout: QVBoxLayout):
+    def _create_mapper_group(self, main_layout: QVBoxLayout, x_label: str, y_label: str):
         """Creates the mapper plot and its associated controls."""
         mapper_group = QWidget()
         layout = QHBoxLayout(mapper_group)
         self.mapper_plot = pg.PlotWidget()
         plot_item = self.mapper_plot.getPlotItem()
         plot_item.setLimits(xMin=-0.01, xMax=1.01, yMin=-0.01, yMax=1.01)
-        plot_item.setLabel('bottom', 'Motion Position')
-        plot_item.setLabel('left', 'Ambient Volume')
+        plot_item.setLabel('bottom', x_label)
+        plot_item.setLabel('left', y_label)
         plot_item.showGrid(x=True, y=True, alpha=0.3)
         plot_item.getViewBox().setMouseEnabled(x=False, y=False)
         plot_item.hideButtons()
@@ -470,8 +482,11 @@ class PositionalAmbientMapperDialog(QDialog):
         layout.addWidget(self.mapper_plot, 1)
 
         button_panel = QVBoxLayout()
-        presets = {"Bypass (Full Volume)": "bypass", "Ramp Up": "ramp_up",
-                   "Ramp Down": "ramp_down", "Bell Curve": "bell"}
+        presets = {
+            "Flat (50%)": "flat_50", "Flat (100%)": "flat_100",
+            "Ramp Up": "ramp_up", "Ramp Down": "ramp_down",
+            "Bell Curve": "bell", "Dip": "dip"
+        }
         for text, key in presets.items():
             btn = QPushButton(text)
             btn.clicked.connect(lambda checked=False, p=key: self._load_preset_curve(p))
@@ -487,13 +502,13 @@ class PositionalAmbientMapperDialog(QDialog):
 
     def _generate_preset_data(self, preset_name: str) -> List:
         """Creates a list of points for a preset curve."""
-        if preset_name == 'ramp_up':
-            return [[0.0, 0.0], [1.0, 1.0]]
-        if preset_name == 'ramp_down':
-            return [[0.0, 1.0], [1.0, 0.0]]
-        if preset_name == 'bell':
-            return [[0.0, 0.0], [0.5, 1.0], [1.0, 0.0]]
-        return [[0.0, 1.0], [1.0, 1.0]]  # bypass
+        if preset_name == 'flat_100': return [[0.0, 1.0], [1.0, 1.0]]
+        if preset_name == 'flat_50': return [[0.0, 0.5], [1.0, 0.5]]
+        if preset_name == 'ramp_up': return [[0.0, 0.0], [1.0, 1.0]]
+        if preset_name == 'ramp_down': return [[0.0, 1.0], [1.0, 0.0]]
+        if preset_name == 'bell': return [[0.0, 0.0], [0.5, 1.0], [1.0, 0.0]]
+        if preset_name == 'dip': return [[0.0, 1.0], [0.5, 0.0], [1.0, 1.0]]
+        return [[0.0, 0.5], [1.0, 0.5]]
 
     def _update_plot_from_data(self):
         """Updates the pyqtgraph plot items from the current working_data."""
@@ -524,6 +539,35 @@ class PositionalAmbientMapperDialog(QDialog):
             if [h.pos() for h in roi.getHandles()] != qpoints:
                 roi.setPoints(qpoints)
                 self._constrain_roi_handles(roi)
+
+    def _on_plot_double_clicked(self, event):
+        """Handles double-clicking on a curve to add a new point."""
+        if event.double():
+            mouse_point = self.mapper_plot.getPlotItem().vb.mapSceneToView(event.scenePos())
+            new_pt, index = self.curve_roi.findNearestSegment(mouse_point)
+            if new_pt is not None and index is not None:
+                dist = np.linalg.norm(np.array([new_pt.x(), new_pt.y()]) - np.array([mouse_point.x(), mouse_point.y()]))
+                if dist < 0.05:
+                    self.curve_roi.addHandle(new_pt, index=index)
+                    self._constrain_roi_handles(self.curve_roi)
+                    self._on_roi_changed(self.curve_roi)
+                    event.accept()
+
+
+# Maintain backwards compatibility for PositionalAmbientMapperDialog
+# by inheriting from the new GenericCurveEditorDialog
+class PositionalAmbientMapperDialog(GenericCurveEditorDialog):
+    """
+    Specific dialog for the Ambient Mapper, now using the generic base.
+    """
+    def __init__(self, initial_mapping_data: Optional[List], parent=None):
+        super().__init__(
+            initial_mapping_data,
+            title="Positional Ambient Volume Mapper",
+            x_label="Motion Position",
+            y_label="Ambient Volume",
+            parent=parent
+        )
 
 
 class ThresholdWidget(QWidget):

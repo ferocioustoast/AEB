@@ -458,19 +458,36 @@ class ModulationSourceManager:
     def _update_spatial_texture(self, position: float, raw_velocity: float):
         """
         Calculates the 'Internal: Spatial Texture' source.
-        This source oscillates based on distance traveled, not time.
-        Amplitude fades to 0 as the frequency approaches the new engine limit (50Hz).
+        Supports both procedural (density-based) and custom (lookup-based) generation.
         """
         live = self.config.live_params
-        density = live.get('spatial_texture_density', 20.0)
         waveform = live.get('spatial_texture_waveform', 'sine')
+
+        if waveform == 'custom':
+            curve = live.get('spatial_texture_map_custom', [[0.0, 0.5], [1.0, 0.5]])
+            # Safety check on curve format
+            if not isinstance(curve, list) or len(curve) < 2:
+                 curve = [[0.0, 0.5], [1.0, 0.5]]
+            
+            pts = np.array(curve)
+            # Use linear interpolation for the custom map lookup
+            try:
+                final_val = float(np.interp(position, pts[:, 0], pts[:, 1]))
+            except Exception:
+                final_val = 0.5
+            
+            self.app_context.modulation_source_store.set_source(
+                "Internal: Spatial Texture", np.clip(final_val, 0.0, 1.0)
+            )
+            return
+
+        # --- Standard Procedural Logic ---
+        density = live.get('spatial_texture_density', 20.0)
         
         # Calculate instantaneous texture frequency (Hz)
         texture_freq = abs(raw_velocity) * density
         
         # Safety Fade Logic (Anti-Aliasing)
-        # Nyquist limit of new 100Hz engine is 50Hz.
-        # We fade out as we approach Nyquist to prevent erratic aliasing.
         fade_start_hz = 40.0
         fade_end_hz = 60.0 # Relaxed slightly past Nyquist to allow natural alias-blur
         
@@ -489,10 +506,6 @@ class ModulationSourceManager:
             return
 
         # Calculate Phase (Distance-based)
-        # We assume position is 0.0 to 1.0.
-        # Phase cycles = Position * Density.
-        # We don't need continuous phase accumulation because it's spatial.
-        # Position 0.5 is always Phase 0.5 * Density.
         phase_normalized = (position * density) % 1.0
         
         raw_val = 0.0
@@ -501,7 +514,6 @@ class ModulationSourceManager:
             raw_val = (math.sin(phase_normalized * 2 * math.pi) + 1.0) / 2.0
         elif waveform == 'triangle':
             # Unipolar Triangle: 0 -> 1 -> 0
-            # 2 * phase if < 0.5 else 2 * (1 - phase)
             if phase_normalized < 0.5:
                 raw_val = 2.0 * phase_normalized
             else:

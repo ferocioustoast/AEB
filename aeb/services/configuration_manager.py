@@ -134,25 +134,47 @@ class ConfigurationManager:
 
     def build_scene_for_saving(self, metadata: Optional[dict] = None) -> dict:
         """
-        Assembles a dictionary of non-default settings for saving a scene.
+        Assembles a dictionary of non-default settings for saving a scene,
+        enforcing a canonical key order for readability.
 
         Args:
             metadata: The UI-provided preset metadata dictionary.
         """
-        source_data = self.app_context.config.get_active_scene_dict()
-        scene_data = {}
-        if metadata:
-            scene_data['preset_metadata'] = metadata
+        # Define the canonical order for saving keys to the JSON file.
+        preferred_order = [
+            'preset_metadata', 'sound_waves', 'modulation_matrix', 'hotkeys',
+            'system_lfos'
+        ]
+        # Get all other keys and sort them alphabetically for consistency.
+        remaining_keys = sorted(
+            list(SCENE_SETTINGS_KEYS - set(preferred_order))
+        )
+        canonical_key_order = preferred_order + remaining_keys
 
-        for key in SCENE_SETTINGS_KEYS:
-            if key == 'preset_metadata': continue
-            current_value, default_value = source_data.get(key), DEFAULT_SETTINGS.get(key)
+        source_data = self.app_context.config.get_active_scene_dict()
+        
+        # Create a temporary dictionary that includes the metadata to be processed
+        # by the main loop, ensuring it gets placed correctly.
+        data_to_process = source_data.copy()
+        if metadata:
+            data_to_process['preset_metadata'] = metadata
+
+        scene_data = {}
+
+        for key in canonical_key_order:
+            if key not in data_to_process:
+                continue
+
+            current_value = data_to_process.get(key)
+            default_value = DEFAULT_SETTINGS.get(key)
+
             if key == 'sound_waves':
                 waves_to_save = self._relativize_sampler_paths(current_value)
                 if waves_to_save != default_value:
                     scene_data[key] = waves_to_save
             elif current_value != default_value:
                 scene_data[key] = current_value
+
         return scene_data
 
     def load_scene_from_path(self, filepath: str) -> bool:

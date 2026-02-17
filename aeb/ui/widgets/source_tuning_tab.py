@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import (
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QFrame,
     QListWidget, QStackedWidget, QSplitter, QWidget, QLabel, QSpinBox,
-    QScrollArea, QComboBox
+    QScrollArea, QComboBox, QPushButton
 )
 
 from aeb.ui.widgets.panels.system_lfos_panel import SystemLfosPanel
+from aeb.ui.widgets.dialogs import GenericCurveEditorDialog
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
@@ -115,7 +116,9 @@ class SourceTuningTab(QWidget):
         
         # Spatial Texture
         self.st_density_spinbox.setValue(cfg.get('spatial_texture_density', 20.0))
-        self.st_waveform_combo.setCurrentText(cfg.get('spatial_texture_waveform', 'sine'))
+        current_wave = cfg.get('spatial_texture_waveform', 'sine')
+        self.st_waveform_combo.setCurrentText(current_wave)
+        self._update_spatial_texture_ui_state(current_wave)
 
         # Viscoelastic Physics
         self.tension_limit_spinbox.setValue(cfg.get('internal_tension_limit'))
@@ -185,7 +188,8 @@ class SourceTuningTab(QWidget):
         
         # Spatial Texture
         self.st_density_spinbox.valueChanged.connect(lambda v: mwu('spatial_texture_density', v))
-        self.st_waveform_combo.currentTextChanged.connect(lambda v: mwu('spatial_texture_waveform', v))
+        self.st_waveform_combo.currentTextChanged.connect(self._on_st_waveform_changed)
+        self.edit_custom_map_btn.clicked.connect(self._launch_custom_map_editor)
 
         # Viscoelastic Physics
         self.tension_limit_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_limit', v))
@@ -340,20 +344,54 @@ class SourceTuningTab(QWidget):
             "If you stop moving, the texture stops pulsing."
         ))
 
+        self.st_waveform_combo = QComboBox()
+        self.st_waveform_combo.addItems(['sine', 'triangle', 'square', 'sawtooth', 'custom'])
+        self.st_waveform_combo.setToolTip(
+            "The shape of the virtual ridges.\n"
+            "Select 'custom' to draw your own map."
+        )
+        layout.addRow("Texture Shape:", self.st_waveform_combo)
+
         self.st_density_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=100.0, singleStep=1.0)
         self.st_density_spinbox.setToolTip(
             "Density: The number of 'bumps' or cycles across the full travel length.\n"
             "Higher values = finer texture (sandpaper).\n"
-            "Lower values = larger bumps (ribs)."
+            "Lower values = larger bumps (ribs).\n"
+            "(Ignored if Shape is 'custom')"
         )
         layout.addRow("Texture Density:", self.st_density_spinbox)
         
-        self.st_waveform_combo = QComboBox()
-        self.st_waveform_combo.addItems(['sine', 'triangle', 'square', 'sawtooth'])
-        self.st_waveform_combo.setToolTip("The shape of the virtual ridges.")
-        layout.addRow("Texture Shape:", self.st_waveform_combo)
+        self.edit_custom_map_btn = QPushButton("Edit Custom Map...")
+        self.edit_custom_map_btn.setVisible(False)
+        self.edit_custom_map_btn.setToolTip("Open the editor to draw your custom texture map.")
+        layout.addRow(self.edit_custom_map_btn)
         
         return group
+
+    def _on_st_waveform_changed(self, text: str):
+        """Updates the UI based on the selected texture waveform."""
+        self._update_spatial_texture_ui_state(text)
+        self.main_window.update_setting_value('spatial_texture_waveform', text)
+
+    def _update_spatial_texture_ui_state(self, waveform: str):
+        """Updates visibility and enabled states for texture controls."""
+        is_custom = (waveform == 'custom')
+        self.edit_custom_map_btn.setVisible(is_custom)
+        self.st_density_spinbox.setEnabled(not is_custom)
+
+    def _launch_custom_map_editor(self):
+        """Opens the custom texture map editor dialog."""
+        current_map = self.app_context.config.get('spatial_texture_map_custom')
+        dialog = GenericCurveEditorDialog(
+            current_map,
+            title="Custom Spatial Texture Map Editor",
+            x_label="Motion Position (0.0 - 1.0)",
+            y_label="Texture Value (0.0 - 1.0)",
+            parent=self
+        )
+        if dialog.exec():
+            final_data = dialog.get_final_mapping_data()
+            self.main_window.update_setting_value('spatial_texture_map_custom', final_data)
 
     def _create_viscoelastic_physics_group(self) -> QWidget:
         """Creates the settings panel for the viscoelastic skin model."""

@@ -203,6 +203,7 @@ DEFAULT_SETTINGS: dict = {
     # Spatial Texture
     'spatial_texture_density': 20.0,
     'spatial_texture_waveform': 'sine',
+    'spatial_texture_map_custom': [[0.0, 0.5], [1.0, 0.5]],
 
     # Live Sync: Screen Flow
     'screen_flow_enabled_on_startup': False,
@@ -337,3 +338,4 @@ GLOBAL_SETTINGS_KEYS = {
 SCENE_SETTINGS_KEYS = set(DEFAULT_SETTINGS.keys()) - GLOBAL_SETTINGS_KEYS
 SCENE_SETTINGS_KEYS.add('positional_mapping')
 SCENE_SETTINGS_KEYS.add('positional_ambient_mapping')
+SCENE_SETTINGS_KEYS.add('spatial_texture_map_custom')
