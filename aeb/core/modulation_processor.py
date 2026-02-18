@@ -121,10 +121,40 @@ def apply_modulations_to_parameters(
             continue
 
         curve = rule.get('curve', 'linear')
+        
+        # --- Curve Processing ---
         if curve == 'exponential':
             source_val = (source_val ** 2) * np.sign(source_val)
         elif curve == 'logarithmic':
             source_val = np.sqrt(abs(source_val)) * np.sign(source_val)
+        elif curve == 'custom':
+            try:
+                curve_data = rule.get('custom_curve_data')
+                if isinstance(curve_data, list) and len(curve_data) >= 2:
+                    # Unzip the list of [x, y] pairs into separate arrays
+                    # This relies on the convention that x values are sorted.
+                    # GenericCurveEditorDialog guarantees sorted output.
+                    points = np.array(curve_data)
+                    xp = points[:, 0]
+                    fp = points[:, 1]
+                    
+                    # Robust Linear Interpolation
+                    # Clamps input to the domain [min(x), max(x)] automatically
+                    source_val = float(np.interp(source_val, xp, fp))
+                else:
+                    # Fallback if data is missing or invalid
+                    if idx not in app_context.warned_mod_rule_indices:
+                        app_context.signals.log_message.emit(
+                            f"WARNING: Rule {idx+1} has invalid custom curve data. Falling back to linear."
+                        )
+                        app_context.warned_mod_rule_indices.add(idx)
+            except Exception:
+                # Catch-all for data corruption (e.g. malformed JSON types)
+                if idx not in app_context.warned_mod_rule_indices:
+                    app_context.signals.log_message.emit(
+                        f"ERROR: Failed to process custom curve for Rule {idx+1}."
+                    )
+                    app_context.warned_mod_rule_indices.add(idx)
 
         try:
             amount = float(rule.get('amount', 0.0))

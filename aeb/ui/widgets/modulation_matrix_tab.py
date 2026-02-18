@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from aeb.config.constants import DEFAULT_SETTINGS
-from aeb.ui.widgets.dialogs import ConditionsDialog
+from aeb.ui.widgets.dialogs import ConditionsDialog, GenericCurveEditorDialog
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
@@ -637,19 +637,66 @@ class ModulationMatrixTab(QWidget):
         widget.currentTextChanged.connect(lambda text, r=row: self._update_amount_widget_for_row(r))
         return widget
 
-    def _create_curve_widget(self, row: int, rule: dict) -> QComboBox:
-        """Creates the response 'Curve' combobox for a row."""
-        widget = QComboBox()
-        widget.addItems(['linear', 'exponential', 'logarithmic'])
-        widget.setToolTip(
+    def _create_curve_widget(self, row: int, rule: dict) -> QWidget:
+        """
+        Creates the 'Curve' selection widget for a row.
+        Includes a combo box and a conditional 'Edit...' button for custom curves.
+        """
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        curve_combo = QComboBox()
+        curve_combo.addItems(['linear', 'exponential', 'logarithmic', 'custom'])
+        curve_combo.setToolTip(
             "The response curve applied to the Source input.<br>"
             "<b>Linear:</b> Direct 1:1 mapping.<br>"
             "<b>Exponential:</b> Slow start, fast finish.<br>"
-            "<b>Logarithmic:</b> Fast start, slow finish."
+            "<b>Logarithmic:</b> Fast start, slow finish.<br>"
+            "<b>Custom:</b> User-defined arbitrary mapping."
         )
-        widget.setCurrentText(rule.get('curve', 'linear'))
-        widget.currentTextChanged.connect(lambda text, r=row: self._on_mod_rule_changed(r, 'curve', text))
+        current_curve = rule.get('curve', 'linear')
+        curve_combo.setCurrentText(current_curve)
+        
+        edit_btn = QPushButton("Edit...")
+        edit_btn.setToolTip("Open the Custom Curve Editor.")
+        edit_btn.setVisible(current_curve == 'custom')
+        
+        layout.addWidget(curve_combo)
+        layout.addWidget(edit_btn)
+        
+        # Connect signals
+        curve_combo.currentTextChanged.connect(lambda text, r=row: self._on_mod_rule_changed(r, 'curve', text))
+        curve_combo.currentTextChanged.connect(lambda text: edit_btn.setVisible(text == 'custom'))
+        edit_btn.clicked.connect(lambda checked=False, r=row: self._handle_edit_custom_curve(r))
+        
         return widget
+
+    def _handle_edit_custom_curve(self, row: int):
+        """
+        Opens the GenericCurveEditorDialog for a specific modulation rule.
+        """
+        try:
+            mod_matrix = self.app_context.config.get_active_scene_dict()['modulation_matrix']
+            rule = mod_matrix[row]
+            
+            # Retrieve existing data or default to linear 0-1
+            current_data = rule.get('custom_curve_data', [[0.0, 0.0], [1.0, 1.0]])
+            
+            dialog = GenericCurveEditorDialog(
+                current_data,
+                title=f"Custom Curve Editor (Rule {row+1})",
+                x_label="Input Source (0.0 - 1.0)",
+                y_label="Output Multiplier",
+                parent=self
+            )
+            
+            if dialog.exec():
+                new_data = dialog.get_final_mapping_data()
+                self._on_mod_rule_changed(row, 'custom_curve_data', new_data)
+                
+        except (IndexError, KeyError):
+            self.main_window.add_message_to_log(f"Error editing custom curve for rule {row}.")
 
     def _create_clamp_widget(self, row: int, rule: dict, key: str) -> QDoubleSpinBox:
         """Creates the 'Clamp Min' or 'Clamp Max' spinbox for a row."""

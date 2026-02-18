@@ -23,8 +23,8 @@ This program generates audio signals intended to control high-voltage e-stim har
 
 ### 🎮 Intelligence & Control
 *   **Deep Modulation Matrix:** Achieve total creative control by routing any source (Gamepad, T-Code, LFOs, Physics, Positional Analysis) to nearly any parameter in the engine.
+*   **Universal Curve Editing:** Define arbitrary, non-linear response curves for any modulation rule. Create dead-zones, S-curves, or specific remapping functions graphically.
 *   **Rhythmic Screen Flow:** Automatically syncs stimulation tempo and intensity to on-screen video content using real-time motion energy analysis.
-*   **Graphical Motion Mapping:** Replace simple crossfades with custom **Amplitude Curves**. Control exactly how every wave responds to its position in 3D space.
 
 ### 🛡️ Signal Integrity & Safety
 *   **Defense-in-Depth Protection:** A multi-stage safety system including **Slew Limiting** (to prevent voltage jumps) and **Dynamic Gain Scaling** (to prevent clipping while preserving texture).
