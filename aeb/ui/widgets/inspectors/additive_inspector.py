@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QFrame, QGridLayout,
     QGroupBox, QHBoxLayout, QLabel, QPushButton, QSlider, QScrollArea,
-    QVBoxLayout, QWidget
+    QVBoxLayout, QWidget, QSizePolicy
 )
 
 from aeb.ui.widgets.inspectors.base import InspectorPanelBase
@@ -123,11 +123,15 @@ class AdditiveInspector(InspectorPanelBase):
         pan_layout_widget = QWidget()
         pan_layout = QHBoxLayout(pan_layout_widget)
         pan_layout.setContentsMargins(0, 0, 0, 0)
+        pan_layout.setSpacing(5)
         
         self.pan_slider = QSlider(Qt.Horizontal, minimum=-100, maximum=100)
+        self.pan_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
         self.pan_spinbox = QDoubleSpinBox(
             minimum=-1.0, maximum=1.0, singleStep=0.01, decimals=2)
-        self.pan_spinbox.setFixedWidth(60)
+        self.pan_spinbox.setMinimumWidth(70)
+        self.pan_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         tip = "Static stereo pan position (-1.0 Left to +1.0 Right)."
         self.pan_slider.setToolTip(tip)
