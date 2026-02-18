@@ -390,18 +390,45 @@ class ConfigurationManager:
     def _normalize_sound_waves(self, sound_waves_dict: dict) -> dict:
         """Ensures a sound_waves dict is fully validated and structured."""
         normalized = copy.deepcopy(DEFAULT_SETTINGS['sound_waves'])
-        if not isinstance(sound_waves_dict, dict): return normalized
+        if not isinstance(sound_waves_dict, dict):
+            return normalized
+
         for ch in ['left', 'right', 'ambient']:
             if ch in sound_waves_dict and isinstance(sound_waves_dict[ch], list):
-                valid_waves = [self._validate_wave(w) for w in sound_waves_dict[ch]]
+                # Pass the channel key 'ch' to the validation function
+                # to provide the necessary context for default values.
+                valid_waves = [self._validate_wave(w, channel_key=ch)
+                               for w in sound_waves_dict[ch]]
                 normalized[ch] = [w for w in valid_waves if w is not None]
         return normalized
 
-    def _validate_wave(self, wave_config: dict) -> Optional[dict]:
-        """Validates a single wave configuration, returning None if invalid."""
-        if not isinstance(wave_config, dict) or 'type' not in wave_config: return None
+    def _validate_wave(self, wave_config: dict, channel_key: str) -> Optional[dict]:
+        """
+        Validates a single wave configuration, returning None if invalid.
+
+        Args:
+            wave_config: The wave dictionary from the loaded scene file.
+            channel_key: The channel ('left', 'right', 'ambient') this
+                         wave belongs to.
+
+        Returns:
+            A complete and validated wave dictionary, or None.
+        """
+        if not isinstance(wave_config, dict) or 'type' not in wave_config:
+            return None
+
         validated = copy.deepcopy(DEFAULT_WAVE_SETTINGS)
         validated.update(wave_config)
+
+        # If 'pan' was NOT specified in the loaded scene file for this wave,
+        # apply the correct channel-specific default value.
+        if 'pan' not in wave_config:
+            if channel_key == 'left':
+                validated['pan'] = -1.0
+            elif channel_key == 'right':
+                validated['pan'] = 1.0
+            # 'ambient' correctly defaults to 0.0 from DEFAULT_WAVE_SETTINGS
+
         return validated
 
     def _deep_merge_dicts(self, base: dict, new: dict) -> dict:
