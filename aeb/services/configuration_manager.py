@@ -395,8 +395,6 @@ class ConfigurationManager:
 
         for ch in ['left', 'right', 'ambient']:
             if ch in sound_waves_dict and isinstance(sound_waves_dict[ch], list):
-                # Pass the channel key 'ch' to the validation function
-                # to provide the necessary context for default values.
                 valid_waves = [self._validate_wave(w, channel_key=ch)
                                for w in sound_waves_dict[ch]]
                 normalized[ch] = [w for w in valid_waves if w is not None]
@@ -404,7 +402,8 @@ class ConfigurationManager:
 
     def _validate_wave(self, wave_config: dict, channel_key: str) -> Optional[dict]:
         """
-        Validates a single wave configuration, returning None if invalid.
+        Validates and coerces a single wave configuration, returning None if
+        fundamentally invalid.
 
         Args:
             wave_config: The wave dictionary from the loaded scene file.
@@ -412,23 +411,46 @@ class ConfigurationManager:
                          wave belongs to.
 
         Returns:
-            A complete and validated wave dictionary, or None.
+            A complete, type-safe, and validated wave dictionary, or None.
         """
         if not isinstance(wave_config, dict) or 'type' not in wave_config:
             return None
 
+        # Start with a clean default template, then merge loaded data
         validated = copy.deepcopy(DEFAULT_WAVE_SETTINGS)
         validated.update(wave_config)
+        
+        # --- Parameter Coercion and Clamping ---
+        # Define ranges for critical float values
+        float_params = {
+            'frequency': (1.0, 20000.0), 'amplitude': (0.0, 10.0),
+            'duty_cycle': (0.01, 1.0), 'pan': (-1.0, 1.0),
+            'ads_attack_time': (0.0, 10.0), 'ads_decay_time': (0.0, 10.0),
+            'ads_sustain_level': (0.0, 1.0), 'adsr_release_time': (0.0, 10.0),
+            'lfo_frequency': (0.01, 100.0), 'lfo_depth': (0.0, 10.0),
+            'filter_cutoff_frequency': (20.0, 20000.0),
+            'filter_resonance_q': (0.1, 30.0),
+            'sampler_frequency': (0.0, 20000.0),
+            'sampler_original_pitch': (1.0, 20000.0),
+            'sampler_loop_start': (0.0, 1.0), 'sampler_loop_end': (0.0, 1.0),
+            'sampler_loop_crossfade_ms': (0.0, 100.0),
+        }
 
-        # If 'pan' was NOT specified in the loaded scene file for this wave,
-        # apply the correct channel-specific default value.
+        for key, (min_val, max_val) in float_params.items():
+            try:
+                # Attempt to cast and then clamp the value
+                validated[key] = np.clip(float(validated[key]), min_val, max_val)
+            except (ValueError, TypeError):
+                # If cast fails, revert to the known-good default
+                validated[key] = DEFAULT_WAVE_SETTINGS[key]
+
+        # --- Context-Aware Default for Pan ---
         if 'pan' not in wave_config:
             if channel_key == 'left':
                 validated['pan'] = -1.0
             elif channel_key == 'right':
                 validated['pan'] = 1.0
-            # 'ambient' correctly defaults to 0.0 from DEFAULT_WAVE_SETTINGS
-
+        
         return validated
 
     def _deep_merge_dicts(self, base: dict, new: dict) -> dict:
