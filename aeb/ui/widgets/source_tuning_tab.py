@@ -6,10 +6,11 @@ tuning all advanced modulation sources.
 """
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QFrame,
     QListWidget, QStackedWidget, QSplitter, QWidget, QLabel, QSpinBox,
-    QScrollArea, QComboBox, QPushButton
+    QScrollArea, QComboBox, QPushButton, QSlider, QSizePolicy
 )
 
 from aeb.ui.widgets.panels.system_lfos_panel import SystemLfosPanel
@@ -139,6 +140,11 @@ class SourceTuningTab(QWidget):
         self.motion_direction_slew_spinbox.setValue(cfg.get('motion_direction_slew_s'))
         self.motion_direction_deadzone_spinbox.setValue(cfg.get('motion_direction_deadzone'))
         self.motion_cycle_hysteresis_spinbox.setValue(cfg.get('motion_cycle_hysteresis'))
+        
+        # Directional Bias
+        current_bias = cfg.get('motion_directional_bias', 0.0)
+        self.directional_bias_spinbox.setValue(current_bias)
+        self.directional_bias_slider.setValue(int(current_bias * 100))
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.setValue(cfg.get('motion_jolt_floor'))
@@ -210,6 +216,17 @@ class SourceTuningTab(QWidget):
         self.motion_direction_slew_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_slew_s', v))
         self.motion_direction_deadzone_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_deadzone', v))
         self.motion_cycle_hysteresis_spinbox.valueChanged.connect(lambda v: mwu('motion_cycle_hysteresis', v))
+        
+        # Directional Bias Sync
+        self.directional_bias_slider.valueChanged.connect(
+            lambda val: self.directional_bias_spinbox.setValue(val / 100.0)
+        )
+        self.directional_bias_spinbox.valueChanged.connect(
+            lambda val: self.directional_bias_slider.setValue(int(val * 100))
+        )
+        self.directional_bias_spinbox.valueChanged.connect(
+            lambda val: mwu('motion_directional_bias', val)
+        )
 
         # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_jolt_floor', v))
@@ -517,6 +534,39 @@ class SourceTuningTab(QWidget):
             "The minimum velocity required to register a change in direction."
         )
         add_row_with_tooltip("Direction Deadzone:", self.motion_direction_deadzone_spinbox)
+
+        # --- Directional Bias Control ---
+        bias_layout_widget = QWidget()
+        bias_layout = QHBoxLayout(bias_layout_widget)
+        bias_layout.setContentsMargins(0, 0, 0, 0)
+        bias_layout.setSpacing(5)
+
+        self.directional_bias_slider = QSlider(Qt.Horizontal, minimum=-100, maximum=100)
+        self.directional_bias_spinbox = QDoubleSpinBox(
+            minimum=-1.0, maximum=1.0, singleStep=0.01, decimals=2
+        )
+        self.directional_bias_spinbox.setMinimumWidth(70)
+        self.directional_bias_spinbox.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed
+        )
+
+        tip = (
+            "Weights intensity based on direction.\n"
+            "Positive (+1.0) = Stronger on Extension (0->1).\n"
+            "Negative (-1.0) = Stronger on Return (1->0).\n"
+            "Zero (0.0) = Balanced/Neutral."
+        )
+        self.directional_bias_slider.setToolTip(tip)
+        self.directional_bias_spinbox.setToolTip(tip)
+
+        bias_layout.addWidget(self.directional_bias_slider)
+        bias_layout.addWidget(self.directional_bias_spinbox)
+        
+        bias_label = QLabel("Directional Bias:")
+        bias_label.setToolTip(tip)
+        layout.addRow(bias_label, bias_layout_widget)
+        # -------------------------------
 
         return group
 

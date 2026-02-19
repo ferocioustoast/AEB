@@ -144,7 +144,7 @@ class ModulationSourceManager:
             "Internal: Transient Impulse", "Internal: Kinetic Impact",
             "Internal: Drift", "Internal: Motion Span",
             "Internal: Motion Cycle Random", "Internal: Differential Potential",
-            "Internal: Spatial Texture"
+            "Internal: Directional Bias", "Internal: Spatial Texture"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -222,7 +222,6 @@ class ModulationSourceManager:
 
     def resize_history_buffers(self, new_window_seconds: float):
         """Resizes deques for motion dynamics."""
-        # CORRECTED: Use dynamic rate instead of hardcoded 60
         new_maxlen = int(new_window_seconds * self.update_rate_hz)
         if new_maxlen <= 0:
             new_maxlen = 1
@@ -386,6 +385,15 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Speed", normalized_speed)
         store.set_source("Primary Motion: Acceleration", normalized_accel)
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
+
+        # --- Internal: Directional Bias ---
+        # Calculates a weighted 0.0-1.0 signal based on direction.
+        # bias > 0: Extension (velocity > 0) -> Higher Output
+        # bias < 0: Return (velocity < 0) -> Higher Output
+        bias_param = live.get('motion_directional_bias', 0.0)
+        directional_bias_signal = (1.0 + (bias_param * self.smoothed_velocity)) / 2.0
+        store.set_source("Internal: Directional Bias", np.clip(directional_bias_signal, 0.0, 1.0))
+        # ----------------------------------
 
         # --- Differential Potential (Edge Detection) ---
         l_vol = self.app_context.live_motor_volume_left
