@@ -55,10 +55,29 @@ class AdditiveGenerator(AudioGeneratorBase):
 
         phase_inc = 2 * np.pi * params['frequency'] / self.sample_rate
         t_samples = np.arange(num_samples)
+        
+        # Calculate fundamental phases first
+        fundamental_phases = self.phase + t_samples * phase_inc
+
+        # --- Phase Jitter Logic (Organic Friction) ---
+        # We apply jitter to the fundamental phase vector.
+        # It will be multiplied by harmonic number, scaling the effect up
+        # for higher harmonics (rougher texture at high freq).
+        jitter = params.get('phase_jitter_amount', 0.0)
+        if jitter > 0.0:
+            noise = np.random.uniform(-1.0, 1.0, num_samples)
+            jitter_offset = noise * jitter * 0.5 * np.pi
+            fundamental_phases += jitter_offset
+        # ---------------------------------------------
+
         harmonic_numbers = np.flatnonzero(active_h_mask) + 1
 
-        phases = (self.phase * harmonic_numbers[:, np.newaxis] +
-                  harmonic_numbers[:, np.newaxis] * t_samples * phase_inc)
+        # Broadcast multiply: (num_harmonics, 1) * (1, num_samples) -> (num_harmonics, num_samples)
+        # We add harmonic_numbers to dimensions to broadcast correctly against the 1D phase array
+        # fundamental_phases is (num_samples,)
+        # harmonic_numbers is (num_active_harmonics,)
+        # Result phases is (num_active_harmonics, num_samples)
+        phases = fundamental_phases * harmonic_numbers[:, np.newaxis]
 
         wave_type = self.config.get('additive_waveform', 'sine')
         harmonic_waves = self._generate_wave_from_phase(phases, wave_type)

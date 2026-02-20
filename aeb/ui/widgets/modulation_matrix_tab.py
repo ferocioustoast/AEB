@@ -192,7 +192,7 @@ class ModulationMatrixTab(QWidget):
         waveform type.
         """
         params = [
-            'amplitude', 'gate', 'pan', 'frequency',
+            'amplitude', 'gate', 'pan', 'frequency', 'phase_jitter_amount',
             'lfo_enabled', 'lfo_frequency', 'lfo_depth',
             'filter_enabled', 'filter_cutoff_frequency', 'filter_resonance_q',
             'ads_attack_time', 'ads_decay_time', 'ads_sustain_level', 'adsr_release_time'
@@ -720,7 +720,7 @@ class ModulationMatrixTab(QWidget):
         cond_btn.clicked.connect(lambda checked=False, r=row: self._handle_edit_conditions(r))
         num_conds = len(rule.get('conditions', []))
         if num_conds > 0:
-            cond_btn.setText(f"Edit ({num_conds})...")
+            cond_btn.setText(f"Edit ({num_conds})..." if num_conds > 0 else "Edit...")
         return cond_btn
 
     def _update_meta_modulated_widget_states(self):

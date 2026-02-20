@@ -425,6 +425,7 @@ class ConfigurationManager:
         float_params = {
             'frequency': (1.0, 20000.0), 'amplitude': (0.0, 10.0),
             'duty_cycle': (0.01, 1.0), 'pan': (-1.0, 1.0),
+            'phase_jitter_amount': (0.0, 1.0),
             'ads_attack_time': (0.0, 10.0), 'ads_decay_time': (0.0, 10.0),
             'ads_sustain_level': (0.0, 1.0), 'adsr_release_time': (0.0, 10.0),
             'lfo_frequency': (0.01, 100.0), 'lfo_depth': (0.0, 10.0),

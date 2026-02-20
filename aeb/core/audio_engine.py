@@ -123,6 +123,7 @@ class AudioGenerator:
             'amplitude': float(cfg.get('amplitude', 1.0)),
             'frequency': base_freq,
             'duty_cycle': float(cfg.get('duty_cycle', 1.0)),
+            'phase_jitter_amount': float(cfg.get('phase_jitter_amount', 0.0)),
             'lfo_frequency': float(cfg.get('lfo_frequency', 1.0)),
             'lfo_depth': float(cfg.get('lfo_depth', 0.5)),
             'filter_cutoff_frequency': float(

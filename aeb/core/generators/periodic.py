@@ -36,6 +36,15 @@ class PeriodicGenerator(AudioGeneratorBase):
             phase_inc[-1] if isinstance(phase_inc, np.ndarray) else phase_inc
         )) % (2 * np.pi)
 
+        # --- Phase Jitter Logic (Organic Friction) ---
+        jitter = params.get('phase_jitter_amount', 0.0)
+        if jitter > 0.0:
+            noise = np.random.uniform(-1.0, 1.0, num_samples)
+            # Scale: At jitter=1.0, noise adds up to +/- pi/2 (+/- 0.25 cycle)
+            jitter_offset = noise * jitter * 0.5 * np.pi
+            phases += jitter_offset
+        # ---------------------------------------------
+
         block = self.output_buffer[:num_samples]
         norm_phase_for_duty = (phases / (2 * np.pi)) % 1.0
 

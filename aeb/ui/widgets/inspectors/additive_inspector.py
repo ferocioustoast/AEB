@@ -64,6 +64,10 @@ class AdditiveInspector(InspectorPanelBase):
             pan_val = conf.get('pan', 0.0)
             self.pan_slider.setValue(int(pan_val * 100))
             self.pan_spinbox.setValue(pan_val)
+            
+            jitter_val = conf.get('phase_jitter_amount', 0.0)
+            self.jitter_slider.setValue(int(jitter_val * 100))
+            self.jitter_spinbox.setValue(jitter_val)
 
             spatial_map = conf.get('spatial_mapping')
             is_spatial_enabled = isinstance(spatial_map, dict) and spatial_map.get('enabled', False)
@@ -119,6 +123,29 @@ class AdditiveInspector(InspectorPanelBase):
             decimals=2, minimum=0, maximum=10, singleStep=0.1)
         self.amp_spinbox.setToolTip("Master output volume for the summed harmonics.")
         layout.addRow("Master Amplitude:", self.amp_spinbox)
+
+        # --- Jitter / Friction Controls ---
+        jitter_layout_widget = QWidget()
+        jitter_layout = QHBoxLayout(jitter_layout_widget)
+        jitter_layout.setContentsMargins(0, 0, 0, 0)
+        jitter_layout.setSpacing(5)
+        
+        self.jitter_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.jitter_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        self.jitter_spinbox = QDoubleSpinBox(
+            minimum=0.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.jitter_spinbox.setMinimumWidth(70)
+        self.jitter_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        jitter_tip = "Adds phase jitter. Effect multiplies with higher harmonics for intense texture."
+        self.jitter_slider.setToolTip(jitter_tip)
+        self.jitter_spinbox.setToolTip(jitter_tip)
+        
+        jitter_layout.addWidget(self.jitter_slider)
+        jitter_layout.addWidget(self.jitter_spinbox)
+        layout.addRow("Phase Jitter / Friction:", jitter_layout_widget)
+        # -----------------------------------
 
         pan_layout_widget = QWidget()
         pan_layout = QHBoxLayout(pan_layout_widget)
@@ -208,7 +235,7 @@ class AdditiveInspector(InspectorPanelBase):
         main_layout.addWidget(self.lfo_enabled_checkbox)
         form = QFormLayout()
         self.lfo_target_combo = QComboBox()
-        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan'])
+        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan', 'phase_jitter_amount'])
         form.addRow("Target:", self.lfo_target_combo)
         self.lfo_shape_combo = QComboBox()
         self.lfo_shape_combo.addItems(
@@ -250,6 +277,7 @@ class AdditiveInspector(InspectorPanelBase):
             self.freq_spinbox: ('frequency', 'valueChanged'),
             self.amp_spinbox: ('amplitude', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
+            self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
             self.dec_spinbox: ('ads_decay_time', 'valueChanged'),
             self.sus_spinbox: ('ads_sustain_level', 'valueChanged'),
@@ -272,6 +300,11 @@ class AdditiveInspector(InspectorPanelBase):
             lambda val: self.pan_spinbox.setValue(val / 100.0))
         self.pan_spinbox.valueChanged.connect(
             lambda val: self.pan_slider.setValue(int(val * 100)))
+            
+        self.jitter_slider.valueChanged.connect(
+            lambda val: self.jitter_spinbox.setValue(val / 100.0))
+        self.jitter_spinbox.valueChanged.connect(
+            lambda val: self.jitter_slider.setValue(int(val * 100)))
 
         for i in range(16):
             self.harmonic_sliders[i].valueChanged.connect(

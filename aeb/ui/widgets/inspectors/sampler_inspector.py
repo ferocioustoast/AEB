@@ -65,6 +65,10 @@ class SamplerInspector(InspectorPanelBase):
             pan_val = conf.get('pan', 0.0)
             self.pan_slider.setValue(int(pan_val * 100))
             self.pan_spinbox.setValue(pan_val)
+            
+            jitter_val = conf.get('phase_jitter_amount', 0.0)
+            self.jitter_slider.setValue(int(jitter_val * 100))
+            self.jitter_spinbox.setValue(jitter_val)
 
             spatial_map = conf.get('spatial_mapping')
             is_spatial_enabled = isinstance(spatial_map, dict) and spatial_map.get('enabled', False)
@@ -156,6 +160,29 @@ class SamplerInspector(InspectorPanelBase):
         self.amp_spinbox.setToolTip("Master output volume for the sampler.")
         layout.addRow("Master Amplitude:", self.amp_spinbox)
         
+        # --- Jitter / Friction Controls ---
+        jitter_layout_widget = QWidget()
+        jitter_layout = QHBoxLayout(jitter_layout_widget)
+        jitter_layout.setContentsMargins(0, 0, 0, 0)
+        jitter_layout.setSpacing(5)
+        
+        self.jitter_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.jitter_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        self.jitter_spinbox = QDoubleSpinBox(
+            minimum=0.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.jitter_spinbox.setMinimumWidth(70)
+        self.jitter_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        jitter_tip = "Adds read-position jitter. Creates a granular, scrubbing texture."
+        self.jitter_slider.setToolTip(jitter_tip)
+        self.jitter_spinbox.setToolTip(jitter_tip)
+        
+        jitter_layout.addWidget(self.jitter_slider)
+        jitter_layout.addWidget(self.jitter_spinbox)
+        layout.addRow("Playhead Jitter / Grit:", jitter_layout_widget)
+        # -----------------------------------
+
         pan_layout_widget = QWidget()
         pan_layout = QHBoxLayout(pan_layout_widget)
         pan_layout.setContentsMargins(0, 0, 0, 0)
@@ -264,7 +291,7 @@ class SamplerInspector(InspectorPanelBase):
         main_layout.addWidget(self.lfo_enabled_checkbox)
         form = QFormLayout()
         self.lfo_target_combo = QComboBox()
-        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan'])
+        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan', 'phase_jitter_amount'])
         form.addRow("Target:", self.lfo_target_combo)
         self.lfo_shape_combo = QComboBox()
         self.lfo_shape_combo.addItems(
@@ -308,6 +335,7 @@ class SamplerInspector(InspectorPanelBase):
             self.type_combo: ('type', 'currentTextChanged'),
             self.amp_spinbox: ('amplitude', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
+            self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.freq_spinbox: ('sampler_frequency', 'valueChanged'),
             self.loop_mode_combo: ('sampler_loop_mode', 'currentTextChanged'),
             self.loop_start_spinbox: ('sampler_loop_start', 'valueChanged'),
@@ -338,6 +366,11 @@ class SamplerInspector(InspectorPanelBase):
             lambda val: self.pan_spinbox.setValue(val / 100.0))
         self.pan_spinbox.valueChanged.connect(
             lambda val: self.pan_slider.setValue(int(val * 100)))
+            
+        self.jitter_slider.valueChanged.connect(
+            lambda val: self.jitter_spinbox.setValue(val / 100.0))
+        self.jitter_spinbox.valueChanged.connect(
+            lambda val: self.jitter_slider.setValue(int(val * 100)))
 
         self.spatial_mapping_checkbox.toggled.connect(self._on_spatial_mapping_toggled)
         self.edit_spatial_map_btn.clicked.connect(self._launch_spatial_mapper_dialog)

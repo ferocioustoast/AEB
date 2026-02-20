@@ -138,6 +138,19 @@ class SamplerGenerator(AudioGeneratorBase):
         playhead_positions = self.playhead + playhead_increments
         self.playhead = playhead_positions[-1]
 
+        # --- Playhead Jitter Logic (Organic Friction) ---
+        # Adds random offset to the read position without affecting the state playhead.
+        jitter = params.get('phase_jitter_amount', 0.0)
+        read_positions = playhead_positions
+        if jitter > 0.0:
+            noise = np.random.uniform(-1.0, 1.0, num_samples)
+            # Scale: jitter=1.0 -> +/- 10ms window (approx 441 samples at 44.1k)
+            # This is significant enough to create granularity without totally losing context.
+            offset_scale = 0.01 * self.sample_rate 
+            jitter_offset = noise * jitter * offset_scale
+            read_positions = playhead_positions + jitter_offset
+        # ------------------------------------------------
+
         total_s = len(self.sample_data)
         block = self.output_buffer[:num_samples]
         loop_mode = self.config.get('sampler_loop_mode', 'Forward Loop')
@@ -157,7 +170,7 @@ class SamplerGenerator(AudioGeneratorBase):
             xfade_ms = self.config.get('sampler_loop_crossfade_ms', 10.0)
             xfade_s = int((xfade_ms / 1000.0) * self.sample_rate)
 
-            for i, pos in enumerate(playhead_positions):
+            for i, pos in enumerate(read_positions):
                 wrapped_pos = np.fmod(pos - start_idx, loop_len) + start_idx
                 if xfade_s > 0 and wrapped_pos > (end_idx - xfade_s):
                     progress = (wrapped_pos - (end_idx - xfade_s)) / xfade_s
@@ -172,7 +185,7 @@ class SamplerGenerator(AudioGeneratorBase):
                 else:
                     block[i] = self._get_interpolated_sample(wrapped_pos)
         else:  # 'Off (One-Shot)'
-            for i, pos in enumerate(playhead_positions):
+            for i, pos in enumerate(read_positions):
                 if pos >= total_s:
                     block[i] = 0.0
                     self.gate_is_on = False

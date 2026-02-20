@@ -68,6 +68,12 @@ class StandardInspector(InspectorPanelBase):
             self.freq_spinbox.setValue(conf.get('frequency', 440.0))
             self.amp_spinbox.setValue(conf.get('amplitude', 1.0))
             self.duty_spinbox.setValue(conf.get('duty_cycle', 1.0))
+            
+            # Jitter
+            jitter_val = conf.get('phase_jitter_amount', 0.0)
+            self.jitter_slider.setValue(int(jitter_val * 100))
+            self.jitter_spinbox.setValue(jitter_val)
+
             pan_val = conf.get('pan', 0.0)
             self.pan_slider.setValue(int(pan_val * 100))
             self.pan_spinbox.setValue(pan_val)
@@ -121,6 +127,29 @@ class StandardInspector(InspectorPanelBase):
         self.duty_spinbox.setToolTip("Pulse width for Square waves (0.5 = Square).")
         layout.addRow("Duty Cycle:", self.duty_spinbox)
         
+        # --- Jitter / Friction Controls ---
+        jitter_layout_widget = QWidget()
+        jitter_layout = QHBoxLayout(jitter_layout_widget)
+        jitter_layout.setContentsMargins(0, 0, 0, 0)
+        jitter_layout.setSpacing(5)
+        
+        self.jitter_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.jitter_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        self.jitter_spinbox = QDoubleSpinBox(
+            minimum=0.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.jitter_spinbox.setMinimumWidth(70)
+        self.jitter_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        jitter_tip = "Adds random micro-stutters to the phase. Simulates sticky/dry friction. Higher = Rougher."
+        self.jitter_slider.setToolTip(jitter_tip)
+        self.jitter_spinbox.setToolTip(jitter_tip)
+        
+        jitter_layout.addWidget(self.jitter_slider)
+        jitter_layout.addWidget(self.jitter_spinbox)
+        layout.addRow("Phase Jitter / Friction:", jitter_layout_widget)
+        # -----------------------------------
+
         pan_layout_widget = QWidget()
         pan_layout = QHBoxLayout(pan_layout_widget)
         pan_layout.setContentsMargins(0, 0, 0, 0)
@@ -199,7 +228,7 @@ class StandardInspector(InspectorPanelBase):
         form = QFormLayout()
         
         self.lfo_target_combo = QComboBox()
-        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'duty_cycle', 'pan'])
+        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'duty_cycle', 'pan', 'phase_jitter_amount'])
         form.addRow("Target:", self.lfo_target_combo)
         
         self.lfo_shape_combo = QComboBox()
@@ -252,6 +281,7 @@ class StandardInspector(InspectorPanelBase):
             self.amp_spinbox: ('amplitude', 'valueChanged'),
             self.duty_spinbox: ('duty_cycle', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
+            self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
             self.dec_spinbox: ('ads_decay_time', 'valueChanged'),
             self.sus_spinbox: ('ads_sustain_level', 'valueChanged'),
@@ -275,6 +305,11 @@ class StandardInspector(InspectorPanelBase):
             lambda val: self.pan_spinbox.setValue(val / 100.0))
         self.pan_spinbox.valueChanged.connect(
             lambda val: self.pan_slider.setValue(int(val * 100)))
+            
+        self.jitter_slider.valueChanged.connect(
+            lambda val: self.jitter_spinbox.setValue(val / 100.0))
+        self.jitter_spinbox.valueChanged.connect(
+            lambda val: self.jitter_slider.setValue(int(val * 100)))
 
         self.spatial_mapping_checkbox.toggled.connect(self._on_spatial_mapping_toggled)
         self.edit_spatial_map_btn.clicked.connect(self._launch_spatial_mapper_dialog)
