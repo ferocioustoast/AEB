@@ -133,6 +133,10 @@ class AudioGenerator:
             'filter_enabled': cfg.get('filter_enabled', False),
             'harmonics': cfg.get('harmonics', [1.0] + [0.0] * 15),
             'pan': float(cfg.get('pan', 0.0)),
+            # --- Added Macro Parameters ---
+            'spectral_tilt': float(cfg.get('spectral_tilt', 0.0)),
+            'odd_even_bias': float(cfg.get('odd_even_bias', 0.0)),
+            # ------------------------------
         }
 
     def _apply_motion_feel(self, params: dict, channel_key: str) -> dict:

@@ -199,6 +199,7 @@ class ModulationMatrixTab(QWidget):
         ]
 
         if wave_type == 'additive':
+            params.extend(['spectral_tilt', 'odd_even_bias'])
             for i in range(16):
                 params.append(f"h{i+1}_amp")
         

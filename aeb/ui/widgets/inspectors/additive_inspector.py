@@ -32,6 +32,7 @@ class AdditiveInspector(InspectorPanelBase):
         title = QLabel("<b>Additive Synthesis Inspector</b>")
         main_layout.addWidget(title, alignment=Qt.AlignCenter)
         main_layout.addWidget(self._create_osc_group())
+        main_layout.addWidget(self._create_macro_group())
         main_layout.addWidget(self._create_spatial_mapping_group())
         main_layout.addWidget(self._create_harmonics_group())
         main_layout.addWidget(self._create_env_group())
@@ -68,6 +69,15 @@ class AdditiveInspector(InspectorPanelBase):
             jitter_val = conf.get('phase_jitter_amount', 0.0)
             self.jitter_slider.setValue(int(jitter_val * 100))
             self.jitter_spinbox.setValue(jitter_val)
+
+            # Macro Parameters
+            tilt_val = conf.get('spectral_tilt', 0.0)
+            self.tilt_slider.setValue(int(tilt_val * 100))
+            self.tilt_spinbox.setValue(tilt_val)
+
+            bias_val = conf.get('odd_even_bias', 0.0)
+            self.bias_slider.setValue(int(bias_val * 100))
+            self.bias_spinbox.setValue(bias_val)
 
             spatial_map = conf.get('spatial_mapping')
             is_spatial_enabled = isinstance(spatial_map, dict) and spatial_map.get('enabled', False)
@@ -167,6 +177,57 @@ class AdditiveInspector(InspectorPanelBase):
         pan_layout.addWidget(self.pan_slider)
         pan_layout.addWidget(self.pan_spinbox)
         layout.addRow("Pan:", pan_layout_widget)
+
+        return group
+
+    def _create_macro_group(self) -> QGroupBox:
+        """Creates the Timbre Macro controls."""
+        group = QGroupBox("Timbre Macros")
+        layout = QFormLayout(group)
+
+        # Spectral Tilt
+        tilt_widget = QWidget()
+        tilt_layout = QHBoxLayout(tilt_widget)
+        tilt_layout.setContentsMargins(0, 0, 0, 0)
+        self.tilt_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.tilt_spinbox = QDoubleSpinBox(minimum=0.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.tilt_spinbox.setMinimumWidth(70)
+        
+        tilt_tip = (
+            "<b>Spectral Tilt:</b> Inject high-frequency content based on the ideal Sawtooth series.<br>"
+            "Adds brightness, buzz, and 'edge'.<br>"
+            "Values from 0.0 (Clean) to 1.0 (Full Buzz)."
+        )
+        self.tilt_slider.setToolTip(tilt_tip)
+        self.tilt_spinbox.setToolTip(tilt_tip)
+        
+        tilt_layout.addWidget(self.tilt_slider)
+        tilt_layout.addWidget(self.tilt_spinbox)
+        label_tilt = QLabel("Spectral Tilt:")
+        label_tilt.setToolTip(tilt_tip)
+        layout.addRow(label_tilt, tilt_widget)
+
+        # Odd/Even Bias
+        bias_widget = QWidget()
+        bias_layout = QHBoxLayout(bias_widget)
+        bias_layout.setContentsMargins(0, 0, 0, 0)
+        self.bias_slider = QSlider(Qt.Horizontal, minimum=-100, maximum=100)
+        self.bias_spinbox = QDoubleSpinBox(minimum=-1.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.bias_spinbox.setMinimumWidth(70)
+
+        bias_tip = (
+            "<b>Odd/Even Bias:</b> Attenuates specific harmonics.<br>"
+            "<b>Negative (-1.0):</b> Odd Bias. Suppresses Even harmonics (Hollow, Square-like).<br>"
+            "<b>Positive (+1.0):</b> Even Bias. Suppresses Odd harmonics (Octave shift)."
+        )
+        self.bias_slider.setToolTip(bias_tip)
+        self.bias_spinbox.setToolTip(bias_tip)
+
+        bias_layout.addWidget(self.bias_slider)
+        bias_layout.addWidget(self.bias_spinbox)
+        label_bias = QLabel("Odd/Even Bias:")
+        label_bias.setToolTip(bias_tip)
+        layout.addRow(label_bias, bias_widget)
 
         return group
 
@@ -291,6 +352,9 @@ class AdditiveInspector(InspectorPanelBase):
             self.filter_type_combo: ('filter_type', 'currentTextChanged'),
             self.filter_freq_spinbox: ('filter_cutoff_frequency', 'valueChanged'),
             self.filter_q_spinbox: ('filter_resonance_q', 'valueChanged'),
+            # Macros
+            self.tilt_spinbox: ('spectral_tilt', 'valueChanged'),
+            self.bias_spinbox: ('odd_even_bias', 'valueChanged'),
         }
         for widget, (key, signal_name) in connections.items():
             signal = widget.__getattribute__(signal_name)
@@ -305,6 +369,17 @@ class AdditiveInspector(InspectorPanelBase):
             lambda val: self.jitter_spinbox.setValue(val / 100.0))
         self.jitter_spinbox.valueChanged.connect(
             lambda val: self.jitter_slider.setValue(int(val * 100)))
+
+        # Macro Slider Sync
+        self.tilt_slider.valueChanged.connect(
+            lambda val: self.tilt_spinbox.setValue(val / 100.0))
+        self.tilt_spinbox.valueChanged.connect(
+            lambda val: self.tilt_slider.setValue(int(val * 100)))
+
+        self.bias_slider.valueChanged.connect(
+            lambda val: self.bias_spinbox.setValue(val / 100.0))
+        self.bias_spinbox.valueChanged.connect(
+            lambda val: self.bias_slider.setValue(int(val * 100)))
 
         for i in range(16):
             self.harmonic_sliders[i].valueChanged.connect(

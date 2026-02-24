@@ -44,6 +44,8 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'soloed': False,
     'harmonics': [1.0] + [0.0] * 15,
     'additive_waveform': 'sine',
+    'spectral_tilt': 0.0,
+    'odd_even_bias': 0.0,
     'sampler_filepath': '',
     'sampler_loop_mode': 'Forward Loop',
     'sampler_loop_start': 0.0,
