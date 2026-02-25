@@ -12,7 +12,7 @@ This program generates audio signals intended to control high-voltage e-stim har
 
 ### 🔊 Advanced Synthesis Engine
 *   **Real-Time Generation:** All audio is generated live. Any parameter change is reflected instantly—no pre-baked audio files or latency.
-*   **Advanced Waveform Generation**: Layer multiple oscillators including Sine, Square, Noise, and a full-featured Sampler. Includes macro controls for real-time spectral morphing.
+*   **Advanced Waveform Generation**: Layer multiple oscillators including Sine, Square, Noise, and a highly versatile **Terrain Sampler**. Includes macro controls for real-time spectral morphing.
 *   **Hybrid Layered Rendering:** A sophisticated model that blends **Moving Layers** (globally panned) with **Zonal Layers** (position-locked textures). Create a moving "ring" that reveals a foundational texture as it passes.
 *   **Three-Channel Architecture:** Dual **Action Channels** for primary motion and a dedicated **Ambient Channel** for foundational environmental sensations.
 

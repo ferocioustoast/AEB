@@ -13,9 +13,8 @@ from aeb.core import path_utils
 class SamplerGenerator(AudioGeneratorBase):
     """
     Generates audio by playing back a loaded audio sample file.
-    It uses a lazy-reference model, looking up the audio data from a central
-    cache at synthesis time. It now fully supports LFO modulation of its
-    playback frequency using a high-performance hybrid synthesis approach.
+    Uses a highly optimized, fully vectorized fractional indexing engine
+    for all playback modes to ensure real-time stability.
     """
     def __init__(self, app_context, initial_config, sample_rate):
         """
@@ -81,34 +80,11 @@ class SamplerGenerator(AudioGeneratorBase):
 
         return False
 
-    def _get_interpolated_sample(self, playhead_pos: float) -> float:
-        """
-        Performs linear interpolation to get a sample at a float index.
-
-        Args:
-            playhead_pos: The floating-point sample index.
-
-        Returns:
-            The interpolated sample value.
-        """
-        if self.sample_data is None:
-            return 0.0
-        total_samples = len(self.sample_data)
-        idx_floor = int(playhead_pos)
-        frac = playhead_pos - idx_floor
-        if idx_floor >= total_samples - 1:
-            return self.sample_data[-1] if total_samples > 0 else 0.0
-        if idx_floor < 0:
-            return self.sample_data[0] if total_samples > 0 else 0.0
-
-        sample1 = self.sample_data[idx_floor]
-        sample2 = self.sample_data[idx_floor + 1]
-        return sample1 + (sample2 - sample1) * frac
-
     def _synthesize_block(self, params: dict, num_samples: int):
         """
-        Synthesizes audio from the sample using a high-performance hybrid
-        (vectorized position calculation, iterative lookup) approach.
+        Synthesizes audio from the sample using a high-performance,
+        fully vectorized fractional indexing approach for all loop modes.
+        Eliminates slow per-sample Python iteration entirely.
 
         Args:
             params: A dictionary of final, modulated parameters for this block.
@@ -121,6 +97,61 @@ class SamplerGenerator(AudioGeneratorBase):
             self.output_buffer[:num_samples].fill(0.0)
             return
 
+        total_samples = len(self.sample_data)
+        block = self.output_buffer[:num_samples]
+        loop_mode = self.config.get('sampler_loop_mode', 'Forward Loop')
+
+        # =====================================================================
+        # MODE 1: SCRUB MODE (The Terrain Engine)
+        # =====================================================================
+        if loop_mode == 'Scrub':
+            target_pos_pct = self.app_context.last_processed_motor_value
+            target_playhead = target_pos_pct * (total_samples - 1)
+            
+            # Slew Limiting (Velocity Clamping)
+            delta_playhead = target_playhead - self.playhead
+            speed_limit = params.get('sampler_scrub_speed_limit', 4000.0)
+            
+            if speed_limit > 0.0:
+                max_delta = (speed_limit / self.sample_rate) * num_samples
+                clamped_delta = np.clip(delta_playhead, -max_delta, max_delta)
+            else:
+                clamped_delta = delta_playhead
+                
+            final_playhead = self.playhead + clamped_delta
+            
+            # Vectorized Path Generation
+            playhead_path = np.linspace(self.playhead, final_playhead, num=num_samples, endpoint=False)
+            
+            # Phase Jitter / Grit Injection
+            jitter = params.get('phase_jitter_amount', 0.0)
+            if jitter > 0.0:
+                noise = np.random.uniform(-1.0, 1.0, num_samples)
+                # Jitter scales to +/- 10ms window
+                offset_scale = 0.01 * self.sample_rate 
+                playhead_path += noise * jitter * offset_scale
+                
+            # Boundary Clamp
+            playhead_path = np.clip(playhead_path, 0, total_samples - 1)
+            
+            # Vectorized Fractional Indexing (Zero-Allocation Interpolation)
+            idx_floor = np.floor(playhead_path).astype(np.int32)
+            frac = playhead_path - idx_floor
+            idx_next = np.clip(idx_floor + 1, 0, total_samples - 1)
+            
+            sample1 = self.sample_data[idx_floor]
+            sample2 = self.sample_data[idx_next]
+            
+            block[:] = sample1 + (sample2 - sample1) * frac
+            
+            # State Update
+            self.playhead = final_playhead
+            block *= params['amplitude'] * envelope
+            return
+
+        # =====================================================================
+        # STANDARD PLAYBACK TIMING CALCULATION
+        # =====================================================================
         target_freq = params.get('frequency', 0.0)
         force_pitch = self.config.get('sampler_force_pitch', False)
         user_pitch = self.config.get('sampler_original_pitch', 100.0)
@@ -138,58 +169,78 @@ class SamplerGenerator(AudioGeneratorBase):
         playhead_positions = self.playhead + playhead_increments
         self.playhead = playhead_positions[-1]
 
-        # --- Playhead Jitter Logic (Organic Friction) ---
-        # Adds random offset to the read position without affecting the state playhead.
+        # Phase Jitter
         jitter = params.get('phase_jitter_amount', 0.0)
         read_positions = playhead_positions
         if jitter > 0.0:
             noise = np.random.uniform(-1.0, 1.0, num_samples)
-            # Scale: jitter=1.0 -> +/- 10ms window (approx 441 samples at 44.1k)
-            # This is significant enough to create granularity without totally losing context.
             offset_scale = 0.01 * self.sample_rate 
             jitter_offset = noise * jitter * offset_scale
             read_positions = playhead_positions + jitter_offset
-        # ------------------------------------------------
 
-        total_s = len(self.sample_data)
-        block = self.output_buffer[:num_samples]
-        loop_mode = self.config.get('sampler_loop_mode', 'Forward Loop')
-
+        # =====================================================================
+        # MODE 2: FORWARD LOOP
+        # =====================================================================
         if loop_mode == 'Forward Loop':
-            start_pct = self.config.get('sampler_loop_start', 0.0)
-            end_pct = self.config.get('sampler_loop_end', 1.0)
-            start_idx = int(start_pct * total_s)
-            end_idx = int(end_pct * total_s)
+            start_pct = params.get('sampler_loop_start', 0.0)
+            end_pct = params.get('sampler_loop_end', 1.0)
+            start_idx = int(start_pct * total_samples)
+            end_idx = int(end_pct * total_samples)
             if start_idx >= end_idx - 1:
-                start_idx, end_idx = 0, total_s - 1
+                start_idx, end_idx = 0, total_samples - 1
 
             loop_len = float(end_idx - start_idx)
             if loop_len < 1.0:
                 loop_len = 1.0
 
-            xfade_ms = self.config.get('sampler_loop_crossfade_ms', 10.0)
+            xfade_ms = params.get('sampler_loop_crossfade_ms', 10.0)
             xfade_s = int((xfade_ms / 1000.0) * self.sample_rate)
 
-            for i, pos in enumerate(read_positions):
-                wrapped_pos = np.fmod(pos - start_idx, loop_len) + start_idx
-                if xfade_s > 0 and wrapped_pos > (end_idx - xfade_s):
-                    progress = (wrapped_pos - (end_idx - xfade_s)) / xfade_s
+            # Vectorized Loop Wrapping
+            wrapped_positions = np.fmod(read_positions - start_idx, loop_len) + start_idx
+            
+            # Base Interpolation
+            idx_floor = np.floor(wrapped_positions).astype(np.int32)
+            frac = wrapped_positions - idx_floor
+            idx_next = np.clip(idx_floor + 1, 0, total_samples - 1)
+            base_samps = self.sample_data[idx_floor] + (self.sample_data[idx_next] - self.sample_data[idx_floor]) * frac
+            
+            # Vectorized Crossfade
+            if xfade_s > 0:
+                xfade_mask = wrapped_positions > (end_idx - xfade_s)
+                if np.any(xfade_mask):
+                    xfade_pos = wrapped_positions[xfade_mask]
+                    progress = (xfade_pos - (end_idx - xfade_s)) / xfade_s
                     fade_out = np.cos(progress * (np.pi / 2.0))
                     fade_in = np.sin(progress * (np.pi / 2.0))
-                    end_samp = self._get_interpolated_sample(wrapped_pos)
-                    start_pos_in_loop = wrapped_pos - (end_idx - xfade_s)
-                    start_samp = self._get_interpolated_sample(
-                        start_idx + start_pos_in_loop
-                    )
-                    block[i] = (end_samp * fade_out) + (start_samp * fade_in)
-                else:
-                    block[i] = self._get_interpolated_sample(wrapped_pos)
-        else:  # 'Off (One-Shot)'
-            for i, pos in enumerate(read_positions):
-                if pos >= total_s:
-                    block[i] = 0.0
-                    self.gate_is_on = False
-                else:
-                    block[i] = self._get_interpolated_sample(pos)
+                    
+                    start_pos_in_loop = xfade_pos - (end_idx - xfade_s)
+                    wrapped_start_pos = start_idx + start_pos_in_loop
+                    
+                    s_idx_floor = np.floor(wrapped_start_pos).astype(np.int32)
+                    s_frac = wrapped_start_pos - s_idx_floor
+                    s_idx_next = np.clip(s_idx_floor + 1, 0, total_samples - 1)
+                    start_samps = self.sample_data[s_idx_floor] + (self.sample_data[s_idx_next] - self.sample_data[s_idx_floor]) * s_frac
+                    
+                    base_samps[xfade_mask] = (base_samps[xfade_mask] * fade_out) + (start_samps * fade_in)
+                    
+            block[:] = base_samps
+
+        # =====================================================================
+        # MODE 3: OFF (ONE-SHOT)
+        # =====================================================================
+        else:
+            valid_mask = read_positions < total_samples
+            valid_pos = read_positions[valid_mask]
+            
+            block.fill(0.0)
+            if np.any(valid_mask):
+                idx_floor = np.floor(valid_pos).astype(np.int32)
+                frac = valid_pos - idx_floor
+                idx_next = np.clip(idx_floor + 1, 0, total_samples - 1)
+                block[valid_mask] = self.sample_data[idx_floor] + (self.sample_data[idx_next] - self.sample_data[idx_floor]) * frac
+                
+            if not np.all(valid_mask):
+                self.gate_is_on = False
 
         block *= params['amplitude'] * envelope

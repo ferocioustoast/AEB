@@ -208,7 +208,8 @@ class ModulationMatrixTab(QWidget):
                 'sampler_loop_start', 
                 'sampler_loop_end', 
                 'sampler_loop_crossfade_ms',
-                'sampler_frequency'
+                'sampler_frequency',
+                'sampler_scrub_speed_limit'
             ])
         
         elif wave_type == 'square':

@@ -54,6 +54,7 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'sampler_frequency': 0.0,
     'sampler_force_pitch': False,
     'sampler_original_pitch': 100.0,
+    'sampler_scrub_speed_limit': 80000.0,
     'pan': 0.0,
     'spatial_mapping': None,
 }

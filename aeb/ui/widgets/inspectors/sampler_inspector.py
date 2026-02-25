@@ -80,7 +80,6 @@ class SamplerInspector(InspectorPanelBase):
             self.freq_spinbox.setValue(conf.get('sampler_frequency', 0.0))
             force_pitch = conf.get('sampler_force_pitch', False)
             self.force_pitch_checkbox.setChecked(force_pitch)
-            self.original_pitch_spinbox.setEnabled(force_pitch)
             self.original_pitch_spinbox.setValue(
                 conf.get('sampler_original_pitch', 100.0))
             if generator and generator.original_sample_pitch > 0:
@@ -88,8 +87,23 @@ class SamplerInspector(InspectorPanelBase):
                     f"{generator.original_sample_pitch:.1f} Hz")
             else:
                 self.detected_pitch_label.setText("N/A")
-            self.loop_mode_combo.setCurrentText(
-                conf.get('sampler_loop_mode', 'Forward Loop'))
+                
+            mode = conf.get('sampler_loop_mode', 'Forward Loop')
+            self.loop_mode_combo.setCurrentText(mode)
+            self.scrub_speed_spinbox.setValue(conf.get('sampler_scrub_speed_limit', 1000000.0))
+            
+            is_scrub = (mode == 'Scrub')
+            self.freq_spinbox.setEnabled(not is_scrub)
+            self.force_pitch_checkbox.setEnabled(not is_scrub)
+            self.original_pitch_spinbox.setEnabled(not is_scrub and force_pitch)
+            self.scrub_speed_spinbox.setEnabled(is_scrub)
+            self.loop_start_spinbox.setEnabled(not is_scrub)
+            self.loop_end_spinbox.setEnabled(not is_scrub)
+            self.crossfade_spinbox.setEnabled(not is_scrub)
+            
+            pitch_tip = "Target playback frequency." if not is_scrub else "Disabled in Scrub Mode. Playback is controlled by motion."
+            self.freq_spinbox.setToolTip(pitch_tip)
+
             self.loop_start_spinbox.setValue(
                 conf.get('sampler_loop_start', 0.0))
             self.loop_end_spinbox.setValue(
@@ -204,6 +218,25 @@ class SamplerInspector(InspectorPanelBase):
         pan_layout.addWidget(self.pan_spinbox)
         layout.addRow("Pan:", pan_layout_widget)
         
+        self.loop_mode_combo = QComboBox()
+        self.loop_mode_combo.addItems(['Forward Loop', 'Off (One-Shot)', 'Scrub'])
+        self.loop_mode_combo.setToolTip(
+            "<b>Forward Loop:</b> Continuously loops between Start and End points.<br>"
+            "<b>One-Shot:</b> Plays once and stops.<br>"
+            "<b>Scrub:</b> Playhead is locked to the physical Primary Motion."
+        )
+        layout.addRow("Playback Mode:", self.loop_mode_combo)
+        self.loop_mode_combo.currentTextChanged.connect(self._on_loop_mode_changed)
+
+        self.scrub_speed_spinbox = QDoubleSpinBox(
+            decimals=1, minimum=0.0, maximum=100000.0, singleStep=100.0)
+        self.scrub_speed_spinbox.setToolTip(
+            "Safety limit for Scrub speed in Hz.\n"
+            "Prevents sudden tracker jumps from translating into painful audio transients.\n"
+            "0.0 = No Limit (Advanced/Risky)."
+        )
+        layout.addRow("Scrub Speed Limit (Hz):", self.scrub_speed_spinbox)
+        
         self.freq_spinbox = QDoubleSpinBox(
             decimals=1, minimum=0, maximum=20000, singleStep=10)
         self.freq_spinbox.setToolTip(
@@ -227,13 +260,6 @@ class SamplerInspector(InspectorPanelBase):
         force_pitch_layout.addWidget(self.original_pitch_spinbox)
         layout.addRow(force_pitch_layout)
         
-        self.loop_mode_combo = QComboBox()
-        self.loop_mode_combo.addItems(['Forward Loop', 'Off (One-Shot)'])
-        self.loop_mode_combo.setToolTip(
-            "<b>Forward Loop:</b> Continuously loops between Start and End points.<br>"
-            "<b>One-Shot:</b> Plays once and stops."
-        )
-        layout.addRow("Loop Mode:", self.loop_mode_combo)
         return group
 
     def _create_spatial_mapping_group(self) -> QGroupBox:
@@ -325,6 +351,28 @@ class SamplerInspector(InspectorPanelBase):
         main_layout.addLayout(form)
         return group
 
+    def _on_loop_mode_changed(self, text: str):
+        """Toggles parameter visibility and applies smart defaults for Scrub mode."""
+        is_scrub = (text == 'Scrub')
+        
+        self.freq_spinbox.setEnabled(not is_scrub)
+        self.force_pitch_checkbox.setEnabled(not is_scrub)
+        self.original_pitch_spinbox.setEnabled(not is_scrub and self.force_pitch_checkbox.isChecked())
+        self.scrub_speed_spinbox.setEnabled(is_scrub)
+        
+        self.loop_start_spinbox.setEnabled(not is_scrub)
+        self.loop_end_spinbox.setEnabled(not is_scrub)
+        self.crossfade_spinbox.setEnabled(not is_scrub)
+        
+        pitch_tip = "Target playback frequency." if not is_scrub else "Disabled in Scrub Mode. Playback is controlled by motion."
+        self.freq_spinbox.setToolTip(pitch_tip)
+        
+        # Smart Filter Default for Safety when switching TO scrub mode
+        if is_scrub and not self.filter_enabled_checkbox.isChecked():
+            self.filter_enabled_checkbox.setChecked(True)
+            self.filter_type_combo.setCurrentText('lowpass')
+            self.filter_freq_spinbox.setValue(2000.0)
+
     def _connect_signals(self):
         """Connects signals for all widgets to the setting_changed signal."""
         self.load_button.clicked.connect(self.file_load_requested)
@@ -341,6 +389,7 @@ class SamplerInspector(InspectorPanelBase):
             self.loop_start_spinbox: ('sampler_loop_start', 'valueChanged'),
             self.loop_end_spinbox: ('sampler_loop_end', 'valueChanged'),
             self.crossfade_spinbox: ('sampler_loop_crossfade_ms', 'valueChanged'),
+            self.scrub_speed_spinbox: ('sampler_scrub_speed_limit', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
             self.dec_spinbox: ('ads_decay_time', 'valueChanged'),
             self.sus_spinbox: ('ads_sustain_level', 'valueChanged'),
