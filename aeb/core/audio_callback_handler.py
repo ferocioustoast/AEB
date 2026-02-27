@@ -188,9 +188,13 @@ class AudioCallbackHandler:
         elif master_pan_offset < 0:
             mix_r *= (1.0 + master_pan_offset)
 
-        # Apply final safe master gain
-        outdata[:, 0] = np.clip(mix_l * safe_master_gain, -1.0, 1.0)
-        outdata[:, 1] = np.clip(mix_r * safe_master_gain, -1.0, 1.0)
+        # Apply final safe master gain and explicitly sanitize ANY NaNs to 0.0 
+        # before passing to the system audio driver.
+        final_l = np.clip(mix_l * safe_master_gain, -1.0, 1.0)
+        final_r = np.clip(mix_r * safe_master_gain, -1.0, 1.0)
+        
+        outdata[:, 0] = np.nan_to_num(final_l, nan=0.0)
+        outdata[:, 1] = np.nan_to_num(final_r, nan=0.0)
 
         store = ctx.modulation_source_store
         store.set_source("Internal: Left Channel Output Level",

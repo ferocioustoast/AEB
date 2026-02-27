@@ -61,8 +61,6 @@ class WaveformsOscilloscopeTab(QWidget):
         file_ops_panel = self._create_waveform_file_ops_panel()
         main_layout.addWidget(file_ops_panel)
         
-        # Removed main_layout.addStretch(1) to prevent empty space at the bottom
-        
         self._connect_signals()
 
     def populate_from_settings(self):
@@ -423,7 +421,7 @@ class WaveformsOscilloscopeTab(QWidget):
     def _run_analysis_worker(self, filepath: str, run_loop_find: bool):
         """
         Creates and executes the unified AnalysisWorker in a background thread,
-        ensuring only one worker runs at a time.
+        ensuring only one worker runs at a time with safe Qt object parentage.
         """
         if self.worker is not None:
             QMessageBox.information(self, "Analysis in Progress",
@@ -432,7 +430,9 @@ class WaveformsOscilloscopeTab(QWidget):
 
         self.sampler_inspector_panel.set_buttons_enabled(False)
         self.main_window.add_message_to_log(f"Analyzing {os.path.basename(filepath)}...")
-        self.thread = QThread()
+        
+        # Parent the thread safely to prevent premature Python GC
+        self.thread = QThread(self)
         self.worker = AnalysisWorker(self.app_context, filepath, run_loop_find)
         self.worker.moveToThread(self.thread)
 
@@ -440,7 +440,22 @@ class WaveformsOscilloscopeTab(QWidget):
         self.worker.finished.connect(self._on_analysis_finished)
         self.worker.error.connect(self._on_analysis_error)
 
+        # Safe teardown bindings natively driven by the Qt event loop
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.error.connect(self.thread.quit)
+        self.thread.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.finished.connect(self._on_worker_thread_finished)
+
         self.thread.start()
+
+    @Slot()
+    def _on_worker_thread_finished(self):
+        """Cleans up python references once the Qt C++ thread has fully exited."""
+        self.worker = None
+        self.thread = None
+        if hasattr(self, 'sampler_inspector_panel'):
+            self.sampler_inspector_panel.set_buttons_enabled(True)
 
     @Slot(dict)
     def _on_analysis_finished(self, result: dict):
@@ -471,24 +486,11 @@ class WaveformsOscilloscopeTab(QWidget):
             self.main_window.add_message_to_log(f"Analysis complete for {os.path.basename(filepath)}.")
         except (IndexError, KeyError, ValueError) as e:
             self._on_analysis_error(f"Error applying analysis results: {e}")
-        finally:
-            self.sampler_inspector_panel.set_buttons_enabled(True)
-            if self.thread is not None:
-                self.thread.quit()
-                self.thread.wait()
-            self.worker = None
-            self.thread = None
 
     @Slot(str)
     def _on_analysis_error(self, error_message: str):
         """Handles any errors from the analysis worker."""
         self.main_window.add_message_to_log(error_message)
-        self.sampler_inspector_panel.set_buttons_enabled(True)
-        if self.thread is not None:
-            self.thread.quit()
-            self.thread.wait()
-        self.worker = None
-        self.thread = None
 
     def _get_selected_sampler_generator(self) -> Optional[SamplerGenerator]:
         """Validates that a sampler wave is selected and returns its generator."""

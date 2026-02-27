@@ -431,6 +431,7 @@ class ConfigurationManager:
             'lfo_frequency': (0.01, 100.0), 'lfo_depth': (0.0, 10.0),
             'filter_cutoff_frequency': (20.0, 20000.0),
             'filter_resonance_q': (0.1, 30.0),
+            'filter_formant_vowel': (0.0, 1.0),
             'sampler_frequency': (0.0, 20000.0),
             'sampler_original_pitch': (1.0, 20000.0),
             'sampler_loop_start': (0.0, 1.0), 'sampler_loop_end': (0.0, 1.0),

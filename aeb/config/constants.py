@@ -40,6 +40,7 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'filter_type': 'lowpass',
     'filter_cutoff_frequency': 1000.0,
     'filter_resonance_q': 0.707,
+    'filter_formant_vowel': 0.0,  # 0.0 (U) to 1.0 (I)
     'muted': False,
     'soloed': False,
     'harmonics': [1.0] + [0.0] * 15,

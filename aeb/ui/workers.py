@@ -3,6 +3,7 @@
 Contains QObject-based worker classes for performing blocking tasks in
 background threads to keep the GUI responsive.
 """
+import math
 import os
 from typing import TYPE_CHECKING
 
@@ -67,9 +68,13 @@ class SampleLoaderWorker(QObject):
             data, sr = sf.read(self.filepath, dtype='float32')
             if data.ndim > 1:
                 data = np.mean(data, axis=1)
+            
+            # Use polyphase filtering to avoid massive FFT arrays (OOM crashes)
             if sr != AUDIO_SAMPLE_RATE:
-                num_samples = int(len(data) * AUDIO_SAMPLE_RATE / sr)
-                data = scipy_signal.resample(data, num_samples)
+                gcd_val = math.gcd(AUDIO_SAMPLE_RATE, sr)
+                up = AUDIO_SAMPLE_RATE // gcd_val
+                down = sr // gcd_val
+                data = scipy_signal.resample_poly(data, up, down)
 
             original_data = data.copy()
             processed_data = _process_sample_data_for_worker(original_data.copy())
@@ -119,9 +124,13 @@ class AnalysisWorker(QObject):
             data, sr = sf.read(self.filepath, dtype='float32')
             if data.ndim > 1:
                 data = np.mean(data, axis=1)
+                
+            # Use polyphase filtering to avoid massive FFT arrays (OOM crashes)
             if sr != AUDIO_SAMPLE_RATE:
-                num_samples = int(len(data) * AUDIO_SAMPLE_RATE / sr)
-                data = scipy_signal.resample(data, num_samples)
+                gcd_val = math.gcd(AUDIO_SAMPLE_RATE, sr)
+                up = AUDIO_SAMPLE_RATE // gcd_val
+                down = sr // gcd_val
+                data = scipy_signal.resample_poly(data, up, down)
 
             original_data = data.copy()
             processed_data = _process_sample_data_for_worker(original_data.copy())

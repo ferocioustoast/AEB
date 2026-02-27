@@ -4,13 +4,14 @@ Contains the AudioGenerator wrapper/factory, the core class for synthesizing
 a single, stateful audio waveform.
 """
 import copy
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 
 import numpy as np
 from scipy import signal as scipy_signal
 
 from aeb.config.constants import AUDIO_SAMPLE_RATE, DEFAULT_SETTINGS
 from aeb.core.generators.base import AudioGeneratorBase
+from aeb.core.audio_math import calculate_formant_coeffs
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
@@ -32,10 +33,18 @@ class AudioGenerator:
         self.app_context = app_context
         self.sample_rate = sample_rate
         self.config = copy.deepcopy(initial_config)
+        
+        # Filter State
         self.filter_zi = None
         self.sos_coeffs = None
+        
+        # Formant Filter State (List of 3 zi arrays)
+        self.formant_filter_zi: List[Optional[np.ndarray]] = [None, None, None]
+        
         self.last_used_cutoff: Optional[float] = None
         self.last_used_q: Optional[float] = None
+        self.last_used_vowel: Optional[float] = None
+        
         self._internal_generator = self._create_generator_from_config()
         self.lfo_phase = 0.0
         self.smoothed_spatial_gain_l: float = 0.0
@@ -80,6 +89,7 @@ class AudioGenerator:
         self._recalculate_filter_coeffs()
         self.last_used_cutoff = None
         self.last_used_q = None
+        self.last_used_vowel = None
 
     def generate_samples(self, eff_params: dict, gate_is_on: bool,
                          num_samples: int) -> np.ndarray:
@@ -129,6 +139,7 @@ class AudioGenerator:
             'filter_cutoff_frequency': float(
                 cfg.get('filter_cutoff_frequency', 1000.0)),
             'filter_resonance_q': float(cfg.get('filter_resonance_q', 0.707)),
+            'filter_formant_vowel': float(cfg.get('filter_formant_vowel', 0.0)),
             'lfo_enabled': cfg.get('lfo_enabled', False),
             'filter_enabled': cfg.get('filter_enabled', False),
             'harmonics': cfg.get('harmonics', [1.0] + [0.0] * 15),
@@ -215,38 +226,69 @@ class AudioGenerator:
         """Applies the IIR filter to the audio block in-place."""
         if not eff_params.get('filter_enabled', False) or not block_view.any():
             return
+        
+        f_type = self.config.get('filter_type', 'lowpass')
         f_q = float(eff_params['filter_resonance_q'])
         f_cutoff_param = eff_params['filter_cutoff_frequency']
-        avg_cutoff = np.mean(f_cutoff_param) if isinstance(f_cutoff_param,
-                                                          np.ndarray) else f_cutoff_param
+        f_vowel = float(eff_params.get('filter_formant_vowel', 0.0))
+        
+        avg_cutoff = np.mean(f_cutoff_param) if isinstance(f_cutoff_param, np.ndarray) else f_cutoff_param
         
         recalculate = (self.sos_coeffs is None or
                        self.last_used_cutoff is None or
                        self.last_used_q is None or
                        abs(avg_cutoff - self.last_used_cutoff) > 1.0 or
-                       abs(f_q - self.last_used_q) > 0.01)
+                       abs(f_q - self.last_used_q) > 0.01 or
+                       (f_type == 'formant' and (self.last_used_vowel is None or abs(f_vowel - self.last_used_vowel) > 0.01)))
 
         if recalculate:
-            self._recalculate_filter_coeffs(avg_cutoff, f_q)
-            self.last_used_cutoff, self.last_used_q = avg_cutoff, f_q
+            self._recalculate_filter_coeffs(avg_cutoff, f_q, f_vowel)
+            self.last_used_cutoff = avg_cutoff
+            self.last_used_q = f_q
+            self.last_used_vowel = f_vowel
             
         if self.sos_coeffs is not None:
-            if self.filter_zi is None:
-                self.filter_zi = scipy_signal.sosfilt_zi(
-                    self.sos_coeffs) * block_view[0]
-            block_view[:], self.filter_zi = scipy_signal.sosfilt(
-                self.sos_coeffs, block_view, zi=self.filter_zi
-            )
+            
+            # --- FORMANT MODE (3 Parallel Filters) ---
+            if f_type == 'formant' and isinstance(self.sos_coeffs, list):
+                # Buffer for summing parallel filters
+                sum_buffer = np.zeros_like(block_view)
+                
+                for i, sos in enumerate(self.sos_coeffs):
+                    if sos is None: continue
+                    
+                    # Initialize state if needed
+                    if self.formant_filter_zi[i] is None:
+                        self.formant_filter_zi[i] = scipy_signal.sosfilt_zi(sos) * block_view[0]
+                    
+                    # Apply filter
+                    filtered_band, self.formant_filter_zi[i] = scipy_signal.sosfilt(
+                        sos, block_view, zi=self.formant_filter_zi[i]
+                    )
+                    sum_buffer += filtered_band
+                
+                # Apply normalization gain to prevent clipping from summing 3 resonant bands
+                block_view[:] = sum_buffer / 3.0
+                
+            # --- STANDARD MODES (Single Filter) ---
+            else:
+                if self.filter_zi is None:
+                    self.filter_zi = scipy_signal.sosfilt_zi(
+                        self.sos_coeffs) * block_view[0]
+                block_view[:], self.filter_zi = scipy_signal.sosfilt(
+                    self.sos_coeffs, block_view, zi=self.filter_zi
+                )
 
     def _recalculate_filter_coeffs(self, f_cutoff: Optional[float] = None,
-                                   f_q: Optional[float] = None):
+                                   f_q: Optional[float] = None,
+                                   f_vowel: Optional[float] = None):
         """
         Recalculates the SOS filter coefficients based on current config.
-        Preserves filter state (zi) to prevent clicking during modulation.
         """
         if not self.config.get('filter_enabled'):
             self.sos_coeffs = None
             self.filter_zi = None
+            self.formant_filter_zi = [None, None, None]
             return
 
         f_type = self.config.get('filter_type', 'lowpass')
@@ -254,6 +296,30 @@ class AudioGenerator:
             f_cutoff = float(self.config.get('filter_cutoff_frequency', 1000.0))
         if f_q is None:
             f_q = float(self.config.get('filter_resonance_q', 0.7071))
+        if f_vowel is None:
+            f_vowel = float(self.config.get('filter_formant_vowel', 0.0))
+
+        # --- FORMANT MODE ---
+        if f_type == 'formant':
+            # Reset standard filter state to prevent crossover garbage
+            if not isinstance(self.sos_coeffs, list):
+                self.filter_zi = None
+            
+            # Use f_cutoff as 'shift_factor' and f_q as 'q_factor'
+            new_coeffs_list = calculate_formant_coeffs(f_vowel, f_cutoff, f_q, self.sample_rate)
+            
+            # Check state consistency
+            if self.sos_coeffs is None or not isinstance(self.sos_coeffs, list):
+                self.formant_filter_zi = [None, None, None]
+            
+            self.sos_coeffs = new_coeffs_list
+            return
+        # --------------------
+
+        # --- STANDARD MODES ---
+        # Reset formant state
+        if isinstance(self.sos_coeffs, list):
+            self.formant_filter_zi = [None, None, None]
 
         nyquist = 0.5 * self.sample_rate
         f_cutoff = np.clip(f_cutoff, 1.0, nyquist - 1.0)
@@ -284,14 +350,13 @@ class AudioGenerator:
         except ValueError:
             new_sos = None
 
-        # State Preservation Logic:
-        # Only reset filter memory (zi) if the filter structure (shape) changes
-        # or if the filter was previously disabled.
+        # State Preservation Logic
         if new_sos is not None:
             if (self.sos_coeffs is None or 
                     self.filter_zi is None or 
+                    isinstance(self.sos_coeffs, list) or
                     new_sos.shape != self.sos_coeffs.shape):
-                self.filter_zi = None  # Force re-initialization in _apply_filter
+                self.filter_zi = None
             
             self.sos_coeffs = new_sos
         else:

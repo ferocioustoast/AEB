@@ -3,9 +3,10 @@
 Contains pure, stateless mathematical and signal processing helper functions
 for audio generation and analysis.
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import numpy as np
+from scipy import signal as scipy_signal
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
@@ -200,3 +201,92 @@ def generate_brown_noise(amplitude_param: float, num_samples: int) -> np.ndarray
 
     final_noise = brown_noise_scaled * amplitude_param
     return final_noise.astype(np.float32)
+
+
+def calculate_formant_coeffs(vowel_position: float, shift_factor: float, 
+                             q_factor: float, sample_rate: int) -> List[np.ndarray]:
+    """
+    Calculates SOS filter coefficients for a 3-band formant filter by
+    interpolating between 5 vowel states (U -> O -> A -> E -> I).
+
+    Args:
+        vowel_position: 0.0 (U) to 1.0 (I).
+        shift_factor: Frequency scaler (e.g. 1.0 = normal, 0.5 = deep).
+        q_factor: Filter resonance/width.
+        sample_rate: Audio sample rate.
+
+    Returns:
+        A list of 3 SOS arrays [SOS_F1, SOS_F2, SOS_F3].
+        Returns empty list if invalid.
+    """
+    # Standard Tenor/Baritone Formants (F1, F2, F3) in Hz
+    # Vowels ordered by spectral ascent: U -> O -> A -> E -> I
+    formants = {
+        'U': [320, 800, 2240],
+        'O': [500, 1000, 2240],
+        'A': [700, 1150, 2440],
+        'E': [500, 1750, 2600],
+        'I': [320, 2200, 3000]
+    }
+    vowel_keys = ['U', 'O', 'A', 'E', 'I']
+    num_segments = len(vowel_keys) - 1
+    
+    pos = np.clip(vowel_position, 0.0, 1.0)
+    scaled_pos = pos * num_segments
+    idx = int(scaled_pos)
+    frac = scaled_pos - idx
+    
+    # Clamp index to safe range
+    idx = min(idx, num_segments - 1)
+    
+    v1 = vowel_keys[idx]
+    v2 = vowel_keys[idx + 1]
+    
+    f_list_1 = formants[v1]
+    f_list_2 = formants[v2]
+    
+    coeffs_list = []
+    nyquist = sample_rate * 0.5
+    
+    for i in range(3):
+        # Linear Interpolation of Frequency
+        freq = f_list_1[i] + (f_list_2[i] - f_list_1[i]) * frac
+        
+        # Apply Shift (Pitch/Size)
+        # Shift is effectively a multiplier centered at 1000Hz in UI
+        # Map 20Hz-20000Hz input to a reasonable multiplier (e.g. 0.2x to 5.0x)
+        # However, caller passes raw Hz. Let's interpret 'shift_factor' as
+        # raw Hz, and normalize it relative to a 'neutral' 1000Hz.
+        multiplier = shift_factor / 1000.0
+        final_freq = freq * multiplier
+        final_freq = np.clip(final_freq, 20.0, nyquist - 100.0)
+        
+        # Calculate SOS
+        # Q is passed directly. Formants usually have fixed bandwidths,
+        # but controllable Q allows for 'singing' vs 'muffled' effects.
+        safe_q = max(0.1, q_factor)
+        
+        try:
+            # Re-implement using explicit band edges for Q control
+            bw = final_freq / safe_q
+            low = final_freq - (bw / 2.0)
+            high = final_freq + (bw / 2.0)
+            
+            # Safety clamp
+            low = max(10.0, low)
+            high = min(nyquist - 10.0, high)
+            
+            if low >= high:
+                # Fallback to safe defaults if Q creates impossible band
+                low, high = final_freq * 0.9, final_freq * 1.1
+            
+            sos = scipy_signal.butter(
+                1, [low, high], btype='band', fs=sample_rate, output='sos'
+            )
+            coeffs_list.append(sos)
+        except Exception:
+            mute_sos = np.zeros((1, 6))
+            mute_sos[0, 3] = 1.0
+            coeffs_list.append(mute_sos)
+
+    return coeffs_list

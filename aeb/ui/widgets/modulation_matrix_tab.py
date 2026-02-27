@@ -195,6 +195,7 @@ class ModulationMatrixTab(QWidget):
             'amplitude', 'gate', 'pan', 'frequency', 'phase_jitter_amount',
             'lfo_enabled', 'lfo_frequency', 'lfo_depth',
             'filter_enabled', 'filter_cutoff_frequency', 'filter_resonance_q',
+            'filter_formant_vowel',
             'ads_attack_time', 'ads_decay_time', 'ads_sustain_level', 'adsr_release_time'
         ]
 

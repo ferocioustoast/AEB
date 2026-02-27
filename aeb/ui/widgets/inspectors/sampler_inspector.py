@@ -121,14 +121,22 @@ class SamplerInspector(InspectorPanelBase):
                 conf.get('lfo_waveform', 'sine'))
             self.lfo_freq_spinbox.setValue(conf.get('lfo_frequency', 1.0))
             self.lfo_depth_spinbox.setValue(conf.get('lfo_depth', 0.5))
+            
+            # Filter
             self.filter_enabled_checkbox.setChecked(
                 conf.get('filter_enabled', False))
-            self.filter_type_combo.setCurrentText(
-                conf.get('filter_type', 'lowpass'))
+            f_type = conf.get('filter_type', 'lowpass')
+            self.filter_type_combo.setCurrentText(f_type)
             self.filter_freq_spinbox.setValue(
                 conf.get('filter_cutoff_frequency', 1000.0))
             self.filter_q_spinbox.setValue(
                 conf.get('filter_resonance_q', 0.707))
+            
+            vowel_val = conf.get('filter_formant_vowel', 0.0)
+            self.formant_slider.setValue(int(vowel_val * 100))
+            self.formant_spinbox.setValue(vowel_val)
+            
+            self._update_filter_ui_state(f_type)
 
     def _create_smp_file_group(self) -> QGroupBox:
         group = QGroupBox("Sample File")
@@ -340,14 +348,31 @@ class SamplerInspector(InspectorPanelBase):
         form = QFormLayout()
         self.filter_type_combo = QComboBox()
         self.filter_type_combo.addItems(
-            ['lowpass', 'highpass', 'bandpass', 'notch'])
+            ['lowpass', 'highpass', 'bandpass', 'notch', 'formant'])
         form.addRow("Type:", self.filter_type_combo)
+        
+        # Formant Vowel Morph
+        self.formant_widget = QWidget()
+        f_layout = QHBoxLayout(self.formant_widget)
+        f_layout.setContentsMargins(0, 0, 0, 0)
+        self.formant_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.formant_spinbox = QDoubleSpinBox(minimum=0.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.formant_spinbox.setMinimumWidth(70)
+        f_layout.addWidget(self.formant_slider)
+        f_layout.addWidget(self.formant_spinbox)
+        self.formant_label = QLabel("Vowel Morph:")
+        form.addRow(self.formant_label, self.formant_widget)
+        
         self.filter_freq_spinbox = QDoubleSpinBox(
             decimals=1, minimum=20, maximum=20000, singleStep=100)
-        form.addRow("Cutoff Freq (Hz):", self.filter_freq_spinbox)
+        self.filter_freq_label = QLabel("Cutoff Freq (Hz):")
+        form.addRow(self.filter_freq_label, self.filter_freq_spinbox)
+        
         self.filter_q_spinbox = QDoubleSpinBox(
             decimals=3, minimum=0.1, maximum=30, singleStep=0.1)
-        form.addRow("Resonance (Q):", self.filter_q_spinbox)
+        self.filter_q_label = QLabel("Resonance (Q):")
+        form.addRow(self.filter_q_label, self.filter_q_spinbox)
+        
         main_layout.addLayout(form)
         return group
 
@@ -372,6 +397,22 @@ class SamplerInspector(InspectorPanelBase):
             self.filter_enabled_checkbox.setChecked(True)
             self.filter_type_combo.setCurrentText('lowpass')
             self.filter_freq_spinbox.setValue(2000.0)
+
+    def _update_filter_ui_state(self, type_text: str):
+        is_formant = (type_text == 'formant')
+        self.formant_widget.setVisible(is_formant)
+        self.formant_label.setVisible(is_formant)
+        
+        if is_formant:
+            self.filter_freq_label.setText("Formant Shift (Hz):")
+            self.filter_freq_spinbox.setToolTip("Scales the vocal tract size. 1000Hz = Neutral. Lower = Giant, Higher = Chipmunk.")
+            self.filter_q_label.setText("Formant Intensity:")
+            self.filter_q_spinbox.setToolTip("Sharpness of the vowel peaks.")
+        else:
+            self.filter_freq_label.setText("Cutoff Freq (Hz):")
+            self.filter_freq_spinbox.setToolTip("The frequency threshold for the filter.")
+            self.filter_q_label.setText("Resonance (Q):")
+            self.filter_q_spinbox.setToolTip("Resonance (peak) at the cutoff frequency.")
 
     def _connect_signals(self):
         """Connects signals for all widgets to the setting_changed signal."""
@@ -405,6 +446,7 @@ class SamplerInspector(InspectorPanelBase):
             self.filter_q_spinbox: ('filter_resonance_q', 'valueChanged'),
             self.force_pitch_checkbox: ('sampler_force_pitch', 'toggled'),
             self.original_pitch_spinbox: ('sampler_original_pitch', 'valueChanged'),
+            self.formant_spinbox: ('filter_formant_vowel', 'valueChanged'),
         }
 
         for widget, (key, signal_name) in connections.items():
@@ -420,7 +462,13 @@ class SamplerInspector(InspectorPanelBase):
             lambda val: self.jitter_spinbox.setValue(val / 100.0))
         self.jitter_spinbox.valueChanged.connect(
             lambda val: self.jitter_slider.setValue(int(val * 100)))
+            
+        self.formant_slider.valueChanged.connect(
+            lambda val: self.formant_spinbox.setValue(val / 100.0))
+        self.formant_spinbox.valueChanged.connect(
+            lambda val: self.formant_slider.setValue(int(val * 100)))
 
+        self.filter_type_combo.currentTextChanged.connect(self._update_filter_ui_state)
         self.spatial_mapping_checkbox.toggled.connect(self._on_spatial_mapping_toggled)
         self.edit_spatial_map_btn.clicked.connect(self._launch_spatial_mapper_dialog)
 

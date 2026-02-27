@@ -8,7 +8,7 @@ import sys
 import threading
 from typing import TYPE_CHECKING, Optional, Dict, Callable, Any
 
-from PySide6.QtCore import QObject, QTimer, Slot
+from PySide6.QtCore import QObject, QTimer, Slot, QThread
 from PySide6.QtWidgets import QMessageBox
 
 from aeb.app_context import EngineConfig
@@ -34,7 +34,6 @@ from aeb.services.waveform_manager import WaveformManager
 from aeb.ui.workers import SampleLoaderWorker
 
 if TYPE_CHECKING:
-    from PySide6.QtCore import QThread
     from aeb.app_context import AppContext
     from aeb.ui.main_window import MainWindow
 
@@ -64,7 +63,7 @@ class MainController(QObject):
         self.lfo_manager = SystemLfoManager(self.app_context)
         self.mod_engine_thread: Optional[threading.Thread] = None
         self.mod_engine_queue = queue.Queue(maxsize=1)
-        self._active_sample_loaders: Dict[str, tuple['QThread', SampleLoaderWorker]] = {}
+        self._active_sample_loaders: Dict[str, tuple[QThread, SampleLoaderWorker]] = {}
 
         self._action_handlers: Dict[str, Callable[[Dict], None]] = {}
 
@@ -387,6 +386,13 @@ class MainController(QObject):
         self.udp_service.stop()
         self.screen_flow_service.stop()
         self.hotkey_manager.stop()
+        
+        # Cleanly stop any active background loading threads
+        for path, (thread, worker) in list(self._active_sample_loaders.items()):
+            if thread.isRunning():
+                thread.quit()
+                thread.wait(1.0)
+                
         if self.app_context.audio_input_stream_stop_event:
             self.app_context.audio_input_stream_stop_event.set()
         if self.app_context.audio_input_stream_thread and self.app_context.audio_input_stream_thread.is_alive():
@@ -507,7 +513,6 @@ class MainController(QObject):
         Identifies all sampler files in the current config and loads any
         that are not already in the cache using background workers.
         """
-        from PySide6.QtCore import QThread
         sound_waves = self.app_context.config.get('sound_waves', {})
         required_paths = set()
         for channel in sound_waves.values():
@@ -526,17 +531,24 @@ class MainController(QObject):
 
             self.app_context.signals.log_message.emit(
                 f"Pre-loading sample: {path}...")
-            thread = QThread()
+                
+            # Properly parent the thread to prevent GC-related segfaults
+            thread = QThread(self)
             worker = SampleLoaderWorker(path)
             worker.moveToThread(thread)
 
             worker.finished.connect(self._on_sample_loaded)
             worker.error.connect(self._on_sample_load_error)
+            
+            # Safe teardown bindings natively driven by the Qt event loop
+            worker.finished.connect(thread.quit)
+            worker.error.connect(thread.quit)
 
             thread.started.connect(worker.run)
             thread.finished.connect(
                 lambda fp=path: self._on_sample_loader_finished(fp))
             thread.finished.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
 
             self._active_sample_loaders[path] = (thread, worker)
             thread.start()
@@ -556,9 +568,6 @@ class MainController(QObject):
                 original_data, processed_data)
         self.app_context.signals.log_message.emit(
             f"Successfully pre-loaded: {filepath}")
-        if filepath in self._active_sample_loaders:
-            thread, _ = self._active_sample_loaders[filepath]
-            thread.quit()
 
     @Slot(str)
     def _on_sample_load_error(self, error_message: str):
@@ -569,9 +578,6 @@ class MainController(QObject):
             error_message: The error string from the worker.
         """
         self.app_context.signals.log_message.emit(error_message)
-        for path, (thread, _) in list(self._active_sample_loaders.items()):
-            if error_message.find(path) != -1 or not thread.isRunning():
-                thread.quit()
 
     @Slot(str)
     def _on_sample_loader_finished(self, filepath: str):
