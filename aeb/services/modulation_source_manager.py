@@ -100,6 +100,10 @@ class ModulationSourceManager:
         self.excitation_level: float = 0.0
         self.stress_level: float = 0.0
         self.excitation_cooldown_timer: float = 0.0
+        
+        # Spatial Thermodynamics (Heatmap) State
+        self.heat_map: np.ndarray = np.zeros(20, dtype=np.float32)
+        self.spatial_heat_output: float = 0.0
 
         # Motion Span State (Peak-to-Peak)
         self._span_min_tracker: float = 0.0
@@ -142,7 +146,7 @@ class ModulationSourceManager:
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
             "Internal: Transient Impulse", "Internal: Kinetic Impact",
-            "Internal: Drift", "Internal: Motion Span",
+            "Internal: Drift", "Internal: Motion Span", "Internal: Spatial Heat",
             "Internal: Motion Cycle Random", "Internal: Differential Potential",
             "Internal: Directional Bias", "Internal: Spatial Texture"
         }
@@ -181,6 +185,10 @@ class ModulationSourceManager:
         self.kinetic_impact_level = 0.0
         self._was_in_impact_zone = False
         self.drift_time = random.uniform(0.0, 256.0)
+        
+        # Reset Heatmap
+        self.heat_map.fill(0.0)
+        self.spatial_heat_output = 0.0
         
         # Reset Motion Span
         self._span_min_tracker = 0.0
@@ -242,6 +250,13 @@ class ModulationSourceManager:
         self._update_system_lfos(delta_time, effective_lfos)
         self._update_transient_impulse(delta_time)
         self.last_update_time = current_time
+
+    def get_heatmap_for_ui(self) -> np.ndarray:
+        """
+        Returns a copy of the current heatmap array for UI visualization.
+        Safe to call from other threads as it returns a copy.
+        """
+        return self.heat_map.copy()
 
     def _update_drift_source(self, delta_time: float):
         """Calculates 'Internal: Drift'."""
@@ -329,6 +344,8 @@ class ModulationSourceManager:
             self.impulse_pos = 0.0
             self.kinetic_impact_level = 0.0
             self.smoothed_velocity = 0.0
+            self.heat_map.fill(0.0)
+            self.spatial_heat_output = 0.0
             self._span_target_value = 0.0
             self._span_current_smoothed = 0.0
             self._mcr_last_extreme = primary_motion_value
@@ -387,9 +404,6 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
 
         # --- Internal: Directional Bias ---
-        # Calculates a weighted 0.0-1.0 signal based on direction.
-        # bias > 0: Extension (velocity > 0) -> Higher Output
-        # bias < 0: Return (velocity < 0) -> Higher Output
         bias_param = live.get('motion_directional_bias', 0.0)
         directional_bias_signal = (1.0 + (bias_param * self.smoothed_velocity)) / 2.0
         store.set_source("Internal: Directional Bias", np.clip(directional_bias_signal, 0.0, 1.0))
@@ -439,11 +453,9 @@ class ModulationSourceManager:
         is_impacting = hit_bottom or hit_top
 
         if is_impacting and not self._was_in_impact_zone:
-            # Trigger impulse on entering the impact state
             self.kinetic_impact_level = 1.0
             self._was_in_impact_zone = True
         elif not is_impacting:
-            # Reset state when leaving the impact conditions
             self._was_in_impact_zone = False
         
         store.set_source("Internal: Kinetic Impact", self.kinetic_impact_level)
@@ -454,6 +466,7 @@ class ModulationSourceManager:
             raw_velocity, safe_dt
         )
         self._update_spatial_texture(primary_motion_value, raw_velocity)
+        self._update_spatial_thermodynamics(primary_motion_value, normalized_speed, safe_dt)
         self._update_somatic_state(safe_dt, normalized_speed, normalized_accel)
         self._update_tension_physics(safe_dt, delta_motion)
         self._update_motion_span(primary_motion_value, current_time)
@@ -462,6 +475,71 @@ class ModulationSourceManager:
         self.last_motion_value = primary_motion_value
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
+
+    def _update_spatial_thermodynamics(self, current_pos: float, speed: float, delta_time: float):
+        """Calculates 'Internal: Spatial Heat' based on motion history."""
+        live = self.config.live_params
+        
+        # 1. Resolution & Resizing
+        target_res = int(live.get('spatial_heat_resolution', 20))
+        target_res = max(2, min(100, target_res)) # Clamp
+        
+        if self.heat_map.shape[0] != target_res:
+            # Resample existing map to new resolution
+            old_indices = np.linspace(0, 1, self.heat_map.shape[0])
+            new_indices = np.linspace(0, 1, target_res)
+            self.heat_map = np.interp(new_indices, old_indices, self.heat_map).astype(np.float32)
+
+        # 2. Decay
+        decay_rate = live.get('spatial_heat_decay', 0.05)
+        self.heat_map -= decay_rate * delta_time
+        
+        # 3. Heat Injection
+        attack = live.get('spatial_heat_attack', 0.1)
+        heat_amount = attack * 50.0 * speed * delta_time
+        
+        # Teleport protection
+        delta_pos = current_pos - self.last_motion_value
+        if abs(delta_pos) > 0.5:
+            # Jumped -> only heat current
+            idx = int(current_pos * (target_res - 1))
+            idx = np.clip(idx, 0, target_res - 1)
+            self.heat_map[idx] += heat_amount
+        else:
+            # Heat path
+            p1 = self.last_motion_value
+            p2 = current_pos
+            if p1 > p2: p1, p2 = p2, p1 # Ensure sorted
+            
+            idx_start = int(p1 * (target_res - 1))
+            idx_end = int(p2 * (target_res - 1)) + 1 # +1 for slice inclusion
+            
+            # Clamp indices
+            idx_start = max(0, idx_start)
+            idx_end = min(target_res, idx_end)
+            
+            self.heat_map[idx_start:idx_end] += heat_amount
+
+        # 4. Clamp
+        np.clip(self.heat_map, 0.0, 1.0, out=self.heat_map)
+        
+        # 5. Output Sampling
+        # Map 0.0-1.0 position to array index space
+        float_idx = current_pos * (target_res - 1)
+        
+        # Linear interpolation from array
+        val = float(np.interp(float_idx, np.arange(target_res), self.heat_map))
+        
+        # 6. Smoothing (1-pole LPF)
+        smoothing = live.get('spatial_heat_smoothing', 0.1)
+        # Smoothing parameter acts as a lag amount (0.0=instant, 0.99=very slow)
+        alpha = 1.0 - np.clip(smoothing, 0.0, 0.99)
+        
+        self.spatial_heat_output += (val - self.spatial_heat_output) * alpha
+        
+        self.app_context.modulation_source_store.set_source(
+            "Internal: Spatial Heat", self.spatial_heat_output
+        )
 
     def _update_spatial_texture(self, position: float, raw_velocity: float):
         """

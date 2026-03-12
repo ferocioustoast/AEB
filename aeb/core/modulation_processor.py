@@ -83,8 +83,11 @@ def apply_modulations_to_parameters(
         # Guard against applying numerical operations to non-numerical types.
         if mode in ['additive', 'multiplicative']:
             target_val = eff_params.get(r_param)
-            # Special case for 'gate' which isn't in base_params but is numerical (0.0/1.0)
-            if r_param != 'gate' and not isinstance(target_val, (int, float, bool, np.number)):
+            
+            # Special exceptions for virtual/nested parameters that aren't directly in base_params
+            is_virtual_param = r_param == 'gate' or (r_param.startswith('h') and r_param.endswith('_amp'))
+            
+            if not is_virtual_param and not isinstance(target_val, (int, float, bool, np.number)):
                 if idx not in app_context.warned_mod_rule_indices:
                     param_type = type(target_val).__name__
                     app_context.signals.log_message.emit(

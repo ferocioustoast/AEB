@@ -276,6 +276,8 @@ class ModulationMatrixTab(QWidget):
                 'internal_time_period_s', 'internal_random_rate_hz',
                 'internal_drift_speed', 'internal_drift_octaves',
                 'spatial_texture_density', 'spatial_texture_waveform',
+                'spatial_heat_resolution', 'spatial_heat_attack',
+                'spatial_heat_decay', 'spatial_heat_smoothing',
                 'env_follower_attack_ms', 'env_follower_release_ms',
                 'motion_norm_window_s', 'motion_speed_floor', 'motion_accel_floor',
                 'motion_jolt_floor', 'motion_cycle_hysteresis', 'motion_directional_bias',

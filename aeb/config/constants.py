@@ -94,6 +94,7 @@ DEFAULT_SETTINGS: dict = {
         # Somatic State Engine Sources
         "Internal: System Excitation": 0.0,
         "Internal: Kinetic Stress": 0.0,
+        "Internal: Spatial Heat": 0.0,
         
         # Viscoelastic Physics Sources
         "Internal: Tension": 0.0,
@@ -209,6 +210,12 @@ DEFAULT_SETTINGS: dict = {
     'spatial_texture_density': 20.0,
     'spatial_texture_waveform': 'sine',
     'spatial_texture_map_custom': [[0.0, 0.5], [1.0, 0.5]],
+
+    # Spatial Thermodynamics
+    'spatial_heat_resolution': 20,
+    'spatial_heat_attack': 0.1,
+    'spatial_heat_decay': 0.037,
+    'spatial_heat_smoothing': 0.1,
 
     # Live Sync: Screen Flow
     'screen_flow_enabled_on_startup': False,

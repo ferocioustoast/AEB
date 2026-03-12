@@ -6,12 +6,14 @@ tuning all advanced modulation sources.
 """
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QFrame,
     QListWidget, QStackedWidget, QSplitter, QWidget, QLabel, QSpinBox,
-    QScrollArea, QComboBox, QPushButton, QSlider, QSizePolicy
+    QScrollArea, QComboBox, QPushButton, QSlider, QSizePolicy, QVBoxLayout
 )
+import pyqtgraph as pg
+import numpy as np
 
 from aeb.ui.widgets.panels.system_lfos_panel import SystemLfosPanel
 from aeb.ui.widgets.dialogs import GenericCurveEditorDialog
@@ -63,6 +65,11 @@ class SourceTuningTab(QWidget):
 
         splitter.setSizes([200, 800])
         self._connect_signals()
+        
+        # Timer for heatmap visualization
+        self.vis_timer = QTimer(self)
+        self.vis_timer.timeout.connect(self._update_heatmap_vis)
+        self.vis_timer.start(50) # 20Hz update rate for UI
 
     def _create_and_add_panels(self):
         """Creates all settings panels and adds them to the list and stack."""
@@ -71,6 +78,7 @@ class SourceTuningTab(QWidget):
                 self.app_context, self.main_window, self.lfo_manager),
             "Signal Safety & Integrity": self._create_signal_fortress_group(),
             "Somatic State Engine": self._create_somatic_state_engine_group(),
+            "Spatial Thermodynamics (Heatmap)": self._create_spatial_thermodynamics_group(),
             "Drift & Internal Generative": self._create_drift_group(),
             "Spatial Texture (Distance-Based)": self._create_spatial_texture_group(),
             "Viscoelastic Skin Physics": self._create_viscoelastic_physics_group(),
@@ -110,6 +118,12 @@ class SourceTuningTab(QWidget):
         self.exc_cooldown_spinbox.setValue(cfg.get('somatic_excitation_cooldown_s'))
         self.stress_attack_spinbox.setValue(cfg.get('somatic_stress_attack_s'))
         self.stress_release_spinbox.setValue(cfg.get('somatic_stress_release_s'))
+        
+        # Spatial Thermodynamics
+        self.heat_res_spinbox.setValue(cfg.get('spatial_heat_resolution'))
+        self.heat_attack_spinbox.setValue(cfg.get('spatial_heat_attack'))
+        self.heat_decay_spinbox.setValue(cfg.get('spatial_heat_decay'))
+        self.heat_smooth_spinbox.setValue(cfg.get('spatial_heat_smoothing'))
 
         # Drift
         self.drift_speed_spinbox.setValue(cfg.get('internal_drift_speed'))
@@ -187,6 +201,12 @@ class SourceTuningTab(QWidget):
         self.exc_cooldown_spinbox.valueChanged.connect(lambda v: mwu('somatic_excitation_cooldown_s', v))
         self.stress_attack_spinbox.valueChanged.connect(lambda v: mwu('somatic_stress_attack_s', v))
         self.stress_release_spinbox.valueChanged.connect(lambda v: mwu('somatic_stress_release_s', v))
+        
+        # Spatial Thermodynamics
+        self.heat_res_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_resolution', v))
+        self.heat_attack_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_attack', v))
+        self.heat_decay_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_decay', v))
+        self.heat_smooth_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_smoothing', v))
 
         # Drift
         self.drift_speed_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_speed', v))
@@ -252,6 +272,78 @@ class SourceTuningTab(QWidget):
         self.impact_threshold_spinbox.valueChanged.connect(lambda v: mwu('impact_threshold', v))
         self.impact_decay_spinbox.valueChanged.connect(lambda v: mwu('impact_decay_s', v))
         self.impact_zone_spinbox.valueChanged.connect(lambda v: mwu('impact_zone_size', v))
+
+    def _create_spatial_thermodynamics_group(self) -> QWidget:
+        """Creates the settings panel for the Spatial Heatmap Engine."""
+        group = QGroupBox("Spatial Thermodynamics (Heatmap)")
+        group.setToolTip(
+            "Tracks localized 'heat' or sensitivity along the motion path.\n"
+            "Simulates friction burn or nerve fatigue at specific spots."
+        )
+        layout = QVBoxLayout(group)
+        
+        form_layout = QFormLayout()
+        
+        self.heat_res_spinbox = QSpinBox(minimum=2, maximum=100)
+        self.heat_res_spinbox.setToolTip(
+            "Resolution: The number of discrete zones along the path.\n"
+            "Higher = finer detail for hotspots."
+        )
+        form_layout.addRow("Resolution (Zones):", self.heat_res_spinbox)
+        
+        self.heat_attack_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=10.0, singleStep=0.1)
+        self.heat_attack_spinbox.setToolTip(
+            "Attack Rate: How fast heat builds up.\n"
+            "Scaled by movement speed. No motion = no heat."
+        )
+        form_layout.addRow("Attack (Heat/Sec):", self.heat_attack_spinbox)
+        
+        self.heat_decay_spinbox = QDoubleSpinBox(decimals=3, minimum=0.0, maximum=1.0, singleStep=0.01)
+        self.heat_decay_spinbox.setToolTip(
+            "Decay Rate: How fast heat dissipates globally when not stimulated."
+        )
+        form_layout.addRow("Decay (Cool/Sec):", self.heat_decay_spinbox)
+        
+        self.heat_smooth_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.99, singleStep=0.05)
+        self.heat_smooth_spinbox.setToolTip(
+            "Output Smoothing: Lag applied to the final modulation signal.\n"
+            "Prevents stepped artifacts when moving between zones."
+        )
+        form_layout.addRow("Output Smoothing:", self.heat_smooth_spinbox)
+        
+        layout.addLayout(form_layout)
+        
+        # Visualizer
+        layout.addWidget(QLabel("<b>Live Thermal State:</b>"))
+        self.heatmap_plot = pg.PlotWidget()
+        self.heatmap_plot.setFixedHeight(100)
+        self.heatmap_plot.setMouseEnabled(x=False, y=False)
+        self.heatmap_plot.hideButtons()
+        self.heatmap_plot.setYRange(0.0, 1.0)
+        self.heatmap_plot.getPlotItem().hideAxis('bottom')
+        self.heatmap_plot.getPlotItem().hideAxis('left')
+        
+        # Use a BarGraphItem for discrete bins
+        self.heatmap_bars = pg.BarGraphItem(x=[0], height=[0], width=1.0,
+            brush='r', pen=None)
+        self.heatmap_plot.addItem(self.heatmap_bars)
+        layout.addWidget(self.heatmap_plot)
+        
+        return group
+
+    def _update_heatmap_vis(self):
+        """Updates the heatmap visualization from the logic engine."""
+        # Only update if this specific panel is visible
+        if self.panel_stack.currentWidget() != self.heatmap_plot.parent():
+            return
+            
+        if not self.app_context.modulation_engine:
+            return
+            
+        heatmap = self.app_context.modulation_engine.mod_source_manager.get_heatmap_for_ui()
+        if len(heatmap) > 0:
+            x = np.arange(len(heatmap))
+            self.heatmap_bars.setOpts(x=x, height=heatmap, width=0.9)
 
     def _create_somatic_state_engine_group(self) -> QWidget:
         """Creates the settings panel for the Somatic State Engine."""
