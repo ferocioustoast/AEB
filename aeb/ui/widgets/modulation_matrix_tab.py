@@ -288,6 +288,8 @@ class ModulationMatrixTab(QWidget):
                 'somatic_excitation_buildup_s', 'somatic_excitation_decay_s',
                 'somatic_excitation_cooldown_s', 'somatic_stress_attack_s',
                 'somatic_stress_release_s',
+                'adhesion_velocity_threshold', 'adhesion_stick_duration',
+                'adhesion_snap_magnitude', 'adhesion_attack_s', 'adhesion_decay_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
                 'impulse_gain_spinbox', 'input_inertia',
                 'impact_threshold', 'impact_decay_s', 'impact_zone_size'
@@ -376,7 +378,7 @@ class ModulationMatrixTab(QWidget):
             lfo_names = [lfo.get('name', '') for lfo in self.app_context.config.get('system_lfos', [])]
             sub_target_combo.addItems(lfo_names)
         elif category_name == 'MotionFeel':
-            sub_target_combo.addItems(['L1', 'L2', 'R0', 'R1', 'R2', 'VR0', 'VL1', 'VV0'])
+            sub_target_combo.addItems(['L1', 'L2', 'R0', 'R1', 'R2', 'VR0', 'VL1', 'VV0', 'VA0'])
         elif category_name == 'Modulation Matrix':
             rule_count = len(self.app_context.config.get_active_scene_dict().get('modulation_matrix', []))
             sub_target_combo.addItems([f"Rule {i+1}" for i in range(rule_count) if i != row])

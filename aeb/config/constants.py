@@ -99,6 +99,7 @@ DEFAULT_SETTINGS: dict = {
         # Viscoelastic Physics Sources
         "Internal: Tension": 0.0,
         "Internal: Shear": 0.0,
+        "Internal: Adhesion Snap": 0.0,
 
         # Geometric Motion Analysis
         "Internal: Motion Span": 0.0,
@@ -262,6 +263,14 @@ DEFAULT_SETTINGS: dict = {
     # Viscoelastic Physics (Skin Model)
     'internal_tension_limit': 0.1,
     'internal_tension_release_rate': 0.5,
+
+ 
+    # Stick-Slip Physics (Adhesion)
+    'adhesion_velocity_threshold': 0.02,
+    'adhesion_stick_duration': 0.1,
+    'adhesion_snap_magnitude': 1.0,
+    'adhesion_attack_s': 0.01,
+    'adhesion_decay_s': 0.05,
 
     # Transient Impulse (Virtual Ripple Physics)
     'impulse_mass': 0.2,

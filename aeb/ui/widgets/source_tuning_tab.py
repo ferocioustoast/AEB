@@ -51,7 +51,6 @@ class SourceTuningTab(QWidget):
         self.category_list.setMaximumWidth(250)
         splitter.addWidget(self.category_list)
 
-        # Wrap the stack in a Scroll Area to allow vertical resizing
         self.right_scroll_area = QScrollArea()
         self.right_scroll_area.setWidgetResizable(True)
         self.right_scroll_area.setFrameShape(QFrame.NoFrame)
@@ -66,10 +65,9 @@ class SourceTuningTab(QWidget):
         splitter.setSizes([200, 800])
         self._connect_signals()
         
-        # Timer for heatmap visualization
         self.vis_timer = QTimer(self)
         self.vis_timer.timeout.connect(self._update_heatmap_vis)
-        self.vis_timer.start(50) # 20Hz update rate for UI
+        self.vis_timer.start(50) 
 
     def _create_and_add_panels(self):
         """Creates all settings panels and adds them to the list and stack."""
@@ -82,6 +80,7 @@ class SourceTuningTab(QWidget):
             "Drift & Internal Generative": self._create_drift_group(),
             "Spatial Texture (Distance-Based)": self._create_spatial_texture_group(),
             "Viscoelastic Skin Physics": self._create_viscoelastic_physics_group(),
+            "Stick-Slip Physics (Adhesion)": self._create_adhesion_physics_group(),
             "Primary Motion Dynamics": self._create_motion_dynamics_group(),
             "Virtual Axis Tuning": self._create_virtual_axis_tuning_group(),
             "Transient Impulse (Ripple)": self._create_transient_impulse_group(),
@@ -95,7 +94,6 @@ class SourceTuningTab(QWidget):
         """Populates all widgets on this tab with current settings."""
         cfg = self.app_context.config
 
-        # System LFOs (delegated to its own panel)
         lfo_panel_index = -1
         for i in range(self.category_list.count()):
             if self.category_list.item(i).text() == "System LFOs":
@@ -107,7 +105,6 @@ class SourceTuningTab(QWidget):
             if isinstance(lfo_panel, SystemLfosPanel):
                 lfo_panel.populate_from_settings()
 
-        # Somatic State Engine (Thermodynamics)
         self.time_period_spinbox.setValue(cfg.get('internal_time_period_s'))
         self.random_rate_spinbox.setValue(cfg.get('internal_random_rate_hz'))
         self.env_attack_spinbox.setValue(cfg.get('env_follower_attack_ms'))
@@ -119,32 +116,32 @@ class SourceTuningTab(QWidget):
         self.stress_attack_spinbox.setValue(cfg.get('somatic_stress_attack_s'))
         self.stress_release_spinbox.setValue(cfg.get('somatic_stress_release_s'))
         
-        # Spatial Thermodynamics
         self.heat_res_spinbox.setValue(cfg.get('spatial_heat_resolution'))
         self.heat_attack_spinbox.setValue(cfg.get('spatial_heat_attack'))
         self.heat_decay_spinbox.setValue(cfg.get('spatial_heat_decay'))
         self.heat_smooth_spinbox.setValue(cfg.get('spatial_heat_smoothing'))
 
-        # Drift
         self.drift_speed_spinbox.setValue(cfg.get('internal_drift_speed'))
         self.drift_octaves_spinbox.setValue(cfg.get('internal_drift_octaves'))
         
-        # Spatial Texture
         self.st_density_spinbox.setValue(cfg.get('spatial_texture_density', 20.0))
         current_wave = cfg.get('spatial_texture_waveform', 'sine')
         self.st_waveform_combo.setCurrentText(current_wave)
         self._update_spatial_texture_ui_state(current_wave)
 
-        # Viscoelastic Physics
         self.tension_limit_spinbox.setValue(cfg.get('internal_tension_limit'))
         self.tension_release_spinbox.setValue(cfg.get('internal_tension_release_rate'))
+        
+        self.adhesion_velocity_threshold_spinbox.setValue(cfg.get('adhesion_velocity_threshold'))
+        self.adhesion_stick_duration_spinbox.setValue(cfg.get('adhesion_stick_duration'))
+        self.adhesion_snap_magnitude_spinbox.setValue(cfg.get('adhesion_snap_magnitude'))
+        self.adhesion_attack_s_spinbox.setValue(cfg.get('adhesion_attack_s'))
+        self.adhesion_decay_s_spinbox.setValue(cfg.get('adhesion_decay_s'))
 
-        # Signal Safety & Integrity
         self.safety_attack_time_spinbox.setValue(cfg.get('safety_attack_time', 0.1))
         self.generator_headroom_limit_spinbox.setValue(cfg.get('generator_headroom_limit'))
         self.channel_safety_limit_spinbox.setValue(cfg.get('channel_safety_limit'))
 
-        # Primary Motion Dynamics
         self.motion_norm_window_spinbox.setValue(cfg.get('motion_norm_window_s'))
         self.motion_speed_floor_spinbox.setValue(cfg.get('motion_speed_floor'))
         self.motion_accel_floor_spinbox.setValue(cfg.get('motion_accel_floor'))
@@ -155,12 +152,10 @@ class SourceTuningTab(QWidget):
         self.motion_direction_deadzone_spinbox.setValue(cfg.get('motion_direction_deadzone'))
         self.motion_cycle_hysteresis_spinbox.setValue(cfg.get('motion_cycle_hysteresis'))
         
-        # Directional Bias
         current_bias = cfg.get('motion_directional_bias', 0.0)
         self.directional_bias_spinbox.setValue(current_bias)
         self.directional_bias_slider.setValue(int(current_bias * 100))
 
-        # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.setValue(cfg.get('motion_jolt_floor'))
         self.vas_vr0_stiffness_spinbox.setValue(cfg.get('vas_vr0_stiffness'))
         self.vas_vr0_damping_spinbox.setValue(cfg.get('vas_vr0_damping'))
@@ -174,13 +169,11 @@ class SourceTuningTab(QWidget):
         
         self.vas_va0_smoothing_spinbox.setValue(cfg.get('vas_va0_smoothing'))
 
-        # Transient Impulse Physics
         self.impulse_mass_spinbox.setValue(cfg.get('impulse_mass'))
         self.impulse_spring_spinbox.setValue(cfg.get('impulse_spring'))
         self.impulse_damping_spinbox.setValue(cfg.get('impulse_damping'))
         self.impulse_gain_spinbox.setValue(cfg.get('impulse_input_gain'))
 
-        # Kinetic Impact Physics
         self.impact_threshold_spinbox.setValue(cfg.get('impact_threshold'))
         self.impact_decay_spinbox.setValue(cfg.get('impact_decay_s'))
         self.impact_zone_spinbox.setValue(cfg.get('impact_zone_size'))
@@ -190,7 +183,6 @@ class SourceTuningTab(QWidget):
         self.category_list.currentRowChanged.connect(self.panel_stack.setCurrentIndex)
         mwu = self.main_window.update_setting_value
 
-        # Somatic State Engine
         self.time_period_spinbox.valueChanged.connect(lambda v: mwu('internal_time_period_s', v))
         self.random_rate_spinbox.valueChanged.connect(lambda v: mwu('internal_random_rate_hz', v))
         self.env_attack_spinbox.valueChanged.connect(lambda v: mwu('env_follower_attack_ms', v))
@@ -202,31 +194,31 @@ class SourceTuningTab(QWidget):
         self.stress_attack_spinbox.valueChanged.connect(lambda v: mwu('somatic_stress_attack_s', v))
         self.stress_release_spinbox.valueChanged.connect(lambda v: mwu('somatic_stress_release_s', v))
         
-        # Spatial Thermodynamics
         self.heat_res_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_resolution', v))
         self.heat_attack_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_attack', v))
         self.heat_decay_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_decay', v))
         self.heat_smooth_spinbox.valueChanged.connect(lambda v: mwu('spatial_heat_smoothing', v))
 
-        # Drift
         self.drift_speed_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_speed', v))
         self.drift_octaves_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_octaves', v))
         
-        # Spatial Texture
         self.st_density_spinbox.valueChanged.connect(lambda v: mwu('spatial_texture_density', v))
         self.st_waveform_combo.currentTextChanged.connect(self._on_st_waveform_changed)
         self.edit_custom_map_btn.clicked.connect(self._launch_custom_map_editor)
 
-        # Viscoelastic Physics
         self.tension_limit_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_limit', v))
         self.tension_release_spinbox.valueChanged.connect(lambda v: mwu('internal_tension_release_rate', v))
 
-        # Signal Safety & Integrity
+        self.adhesion_velocity_threshold_spinbox.valueChanged.connect(lambda v: mwu('adhesion_velocity_threshold', v))
+        self.adhesion_stick_duration_spinbox.valueChanged.connect(lambda v: mwu('adhesion_stick_duration', v))
+        self.adhesion_snap_magnitude_spinbox.valueChanged.connect(lambda v: mwu('adhesion_snap_magnitude', v))
+        self.adhesion_attack_s_spinbox.valueChanged.connect(lambda v: mwu('adhesion_attack_s', v))
+        self.adhesion_decay_s_spinbox.valueChanged.connect(lambda v: mwu('adhesion_decay_s', v))
+
         self.safety_attack_time_spinbox.valueChanged.connect(lambda v: mwu('safety_attack_time', v))
         self.generator_headroom_limit_spinbox.valueChanged.connect(lambda v: mwu('generator_headroom_limit', v))
         self.channel_safety_limit_spinbox.valueChanged.connect(lambda v: mwu('channel_safety_limit', v))
 
-        # Primary Motion Dynamics
         self.motion_norm_window_spinbox.valueChanged.connect(lambda v: mwu('motion_norm_window_s', v))
         self.motion_speed_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_speed_floor', v))
         self.motion_accel_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_accel_floor', v))
@@ -237,7 +229,6 @@ class SourceTuningTab(QWidget):
         self.motion_direction_deadzone_spinbox.valueChanged.connect(lambda v: mwu('motion_direction_deadzone', v))
         self.motion_cycle_hysteresis_spinbox.valueChanged.connect(lambda v: mwu('motion_cycle_hysteresis', v))
         
-        # Directional Bias Sync
         self.directional_bias_slider.valueChanged.connect(
             lambda val: self.directional_bias_spinbox.setValue(val / 100.0)
         )
@@ -248,7 +239,6 @@ class SourceTuningTab(QWidget):
             lambda val: mwu('motion_directional_bias', val)
         )
 
-        # Virtual Axis Tuning
         self.motion_jolt_floor_spinbox.valueChanged.connect(lambda v: mwu('motion_jolt_floor', v))
         self.vas_vr0_stiffness_spinbox.valueChanged.connect(lambda v: mwu('vas_vr0_stiffness', v))
         self.vas_vr0_damping_spinbox.valueChanged.connect(lambda v: mwu('vas_vr0_damping', v))
@@ -262,16 +252,45 @@ class SourceTuningTab(QWidget):
         
         self.vas_va0_smoothing_spinbox.valueChanged.connect(lambda v: mwu('vas_va0_smoothing', v))
 
-        # Transient Impulse
         self.impulse_mass_spinbox.valueChanged.connect(lambda v: mwu('impulse_mass', v))
         self.impulse_spring_spinbox.valueChanged.connect(lambda v: mwu('impulse_spring', v))
         self.impulse_damping_spinbox.valueChanged.connect(lambda v: mwu('impulse_damping', v))
         self.impulse_gain_spinbox.valueChanged.connect(lambda v: mwu('impulse_input_gain', v))
 
-        # Kinetic Impact
         self.impact_threshold_spinbox.valueChanged.connect(lambda v: mwu('impact_threshold', v))
         self.impact_decay_spinbox.valueChanged.connect(lambda v: mwu('impact_decay_s', v))
         self.impact_zone_spinbox.valueChanged.connect(lambda v: mwu('impact_zone_size', v))
+
+    def _create_adhesion_physics_group(self) -> QWidget:
+        """Creates the settings panel for Stick-Slip Adhesion physics."""
+        group = QGroupBox("Stick-Slip Physics (Adhesion)")
+        group.setToolTip(
+            "Simulates 'stiction'. When motion stops, surfaces bond. "
+            "When motion resumes, the seal breaks with a sharp physical transient."
+        )
+        layout = QFormLayout(group)
+        
+        self.adhesion_velocity_threshold_spinbox = QDoubleSpinBox(decimals=3, minimum=0.001, maximum=0.1, singleStep=0.005)
+        self.adhesion_velocity_threshold_spinbox.setToolTip("Sets the speed below which surfaces begin to stick.")
+        layout.addRow("Velocity Threshold:", self.adhesion_velocity_threshold_spinbox)
+        
+        self.adhesion_stick_duration_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=1.0, singleStep=0.05, suffix=" s")
+        self.adhesion_stick_duration_spinbox.setToolTip("How long you must stay still before the seal is formed.")
+        layout.addRow("Stick Duration:", self.adhesion_stick_duration_spinbox)
+        
+        self.adhesion_snap_magnitude_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=5.0, singleStep=0.1)
+        self.adhesion_snap_magnitude_spinbox.setToolTip("The master strength of the physical 'pop' when breaking free.")
+        layout.addRow("Snap Magnitude:", self.adhesion_snap_magnitude_spinbox)
+        
+        self.adhesion_attack_s_spinbox = QDoubleSpinBox(decimals=3, minimum=0.001, maximum=0.5, singleStep=0.005, suffix=" s")
+        self.adhesion_attack_s_spinbox.setToolTip("Safety envelope. How fast the snap hits. Keep >0.01 to avoid audio clicks.")
+        layout.addRow("Snap Attack:", self.adhesion_attack_s_spinbox)
+        
+        self.adhesion_decay_s_spinbox = QDoubleSpinBox(decimals=3, minimum=0.01, maximum=1.0, singleStep=0.01, suffix=" s")
+        self.adhesion_decay_s_spinbox.setToolTip("How quickly the snap sensation fades back to zero.")
+        layout.addRow("Snap Decay:", self.adhesion_decay_s_spinbox)
+        
+        return group
 
     def _create_spatial_thermodynamics_group(self) -> QWidget:
         """Creates the settings panel for the Spatial Heatmap Engine."""
@@ -313,7 +332,6 @@ class SourceTuningTab(QWidget):
         
         layout.addLayout(form_layout)
         
-        # Visualizer
         layout.addWidget(QLabel("<b>Live Thermal State:</b>"))
         self.heatmap_plot = pg.PlotWidget()
         self.heatmap_plot.setFixedHeight(100)
@@ -323,7 +341,6 @@ class SourceTuningTab(QWidget):
         self.heatmap_plot.getPlotItem().hideAxis('bottom')
         self.heatmap_plot.getPlotItem().hideAxis('left')
         
-        # Use a BarGraphItem for discrete bins
         self.heatmap_bars = pg.BarGraphItem(x=[0], height=[0], width=1.0,
             brush='r', pen=None)
         self.heatmap_plot.addItem(self.heatmap_bars)
@@ -333,7 +350,6 @@ class SourceTuningTab(QWidget):
 
     def _update_heatmap_vis(self):
         """Updates the heatmap visualization from the logic engine."""
-        # Only update if this specific panel is visible
         if self.panel_stack.currentWidget() != self.heatmap_plot.parent():
             return
             
@@ -354,7 +370,6 @@ class SourceTuningTab(QWidget):
         )
         layout = QFormLayout(group)
         
-        # Basic Internal Sources
         self.time_period_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=7200.0, suffix=" s")
         self.time_period_spinbox.setToolTip(
             "The duration of one full cycle (0.0 to 1.0) for the 'Internal: Time' source.\n"
@@ -382,7 +397,6 @@ class SourceTuningTab(QWidget):
         )
         layout.addRow("Audio Level Release:", self.env_release_spinbox)
         
-        # System Excitation
         layout.addRow(QLabel("<b>System Excitation (Integrator)</b>"))
         
         self.exc_buildup_spinbox = QDoubleSpinBox(decimals=1, minimum=1.0, maximum=600.0, suffix=" s")
@@ -404,7 +418,6 @@ class SourceTuningTab(QWidget):
         )
         layout.addRow("Cooldown Hold:", self.exc_cooldown_spinbox)
 
-        # Kinetic Stress
         layout.addRow(QLabel("<b>Kinetic Stress (Follower)</b>"))
         
         self.stress_attack_spinbox = QDoubleSpinBox(decimals=2, minimum=0.01, maximum=5.0, suffix=" s")
@@ -557,7 +570,6 @@ class SourceTuningTab(QWidget):
         layout = QFormLayout(group)
         
         def add_row_with_tooltip(label_text, widget):
-            """Helper to ensure the label gets the same tooltip as the widget."""
             label = QLabel(label_text)
             label.setToolTip(widget.toolTip())
             layout.addRow(label, widget)
@@ -627,7 +639,6 @@ class SourceTuningTab(QWidget):
         )
         add_row_with_tooltip("Direction Deadzone:", self.motion_direction_deadzone_spinbox)
 
-        # --- Directional Bias Control ---
         bias_layout_widget = QWidget()
         bias_layout = QHBoxLayout(bias_layout_widget)
         bias_layout.setContentsMargins(0, 0, 0, 0)
@@ -658,7 +669,6 @@ class SourceTuningTab(QWidget):
         bias_label = QLabel("Directional Bias:")
         bias_label.setToolTip(tip)
         layout.addRow(bias_label, bias_layout_widget)
-        # -------------------------------
 
         return group
 
@@ -674,7 +684,6 @@ class SourceTuningTab(QWidget):
         self.vas_vr0_damping_spinbox.setToolTip("V-R0 (Twist) Damping. Controls 'weight' and prevents oscillation. Low values allow for 'wobble'.")
         layout.addRow("V-R0 Damping:", self.vas_vr0_damping_spinbox)
 
-        # --- V-L1 (Lateral Inertia) Controls ---
         layout.addRow(QLabel("<b>V-L1 (Lateral Inertia)</b>"))
         
         self.vas_inertia_mass_spinbox = QDoubleSpinBox(decimals=2, minimum=0.01, maximum=10.0, singleStep=0.1)
@@ -688,7 +697,6 @@ class SourceTuningTab(QWidget):
         self.vas_inertia_damping_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=100.0, singleStep=1.0)
         self.vas_inertia_damping_spinbox.setToolTip("Damping. Higher = Less wobble duration.")
         layout.addRow("Inertia Damping:", self.vas_inertia_damping_spinbox)
-        # ---------------------------------------
 
         layout.addRow(QLabel("<b>V-V0 (Texture)</b>"))
         self.vas_vv0_stiffness_spinbox = QDoubleSpinBox(decimals=1, minimum=1.0, maximum=1000.0, singleStep=10.0)

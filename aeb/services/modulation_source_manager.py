@@ -88,6 +88,13 @@ class ModulationSourceManager:
         # Viscoelastic Physics Variables
         self.tension_offset: float = 0.0
 
+        # Stick-Slip (Adhesion) Physics State
+        self.adhesion_is_stuck: bool = False
+        self.adhesion_bond_timer: float = 0.0
+        self.adhesion_level: float = 0.0
+        self.adhesion_target_level: float = 0.0
+        self.adhesion_stage: str = 'idle'
+
         # Transient Impulse Physics State (Virtual Ripple)
         self.impulse_pos: float = 0.0
         self.impulse_vel: float = 0.0
@@ -122,7 +129,6 @@ class ModulationSourceManager:
         random.shuffle(self._perm)
         self._perm += self._perm
 
-        # CORRECTED: Dynamic sizing based on actual update rate
         history_len = int(
             self.config.live_params.get('motion_norm_window_s', 8.0) * self.update_rate_hz
         )
@@ -145,10 +151,11 @@ class ModulationSourceManager:
             "TCode: V-R0", "TCode: V-L1",
             "TCode: V-V0", "TCode: V-A0", "Internal: System Excitation",
             "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
-            "Internal: Transient Impulse", "Internal: Kinetic Impact",
-            "Internal: Drift", "Internal: Motion Span", "Internal: Spatial Heat",
-            "Internal: Motion Cycle Random", "Internal: Differential Potential",
-            "Internal: Directional Bias", "Internal: Spatial Texture"
+            "Internal: Adhesion Snap", "Internal: Transient Impulse", 
+            "Internal: Kinetic Impact", "Internal: Drift", "Internal: Motion Span", 
+            "Internal: Spatial Heat", "Internal: Motion Cycle Random", 
+            "Internal: Differential Potential", "Internal: Directional Bias", 
+            "Internal: Spatial Texture"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -180,17 +187,22 @@ class ModulationSourceManager:
         self.stress_level = 0.0
         self.excitation_cooldown_timer = 0.0
         self.tension_offset = 0.0
+        
+        self.adhesion_is_stuck = False
+        self.adhesion_bond_timer = 0.0
+        self.adhesion_level = 0.0
+        self.adhesion_target_level = 0.0
+        self.adhesion_stage = 'idle'
+        
         self.impulse_pos = 0.0
         self.impulse_vel = 0.0
         self.kinetic_impact_level = 0.0
         self._was_in_impact_zone = False
         self.drift_time = random.uniform(0.0, 256.0)
         
-        # Reset Heatmap
         self.heat_map.fill(0.0)
         self.spatial_heat_output = 0.0
         
-        # Reset Motion Span
         self._span_min_tracker = 0.0
         self._span_max_tracker = 0.0
         self._span_is_moving_up = True
@@ -199,7 +211,6 @@ class ModulationSourceManager:
         self._span_last_turnaround_time = current_time
         self._span_initialized = False
 
-        # Reset Direction & Motion Cycle Random
         self._direction_target = 0.5
         self._direction_current_val = 0.5
         self._mcr_current_value = 0.5
@@ -306,7 +317,6 @@ class ModulationSourceManager:
         """Resets all motion-derived modulation sources to zero."""
         store = self.app_context.modulation_source_store
         for key in self._motion_source_keys:
-            # Special case: Motion Cycle Random holds its value on stop, don't zero it
             if key != "Internal: Motion Cycle Random":
                 store.set_source(key, 0.0)
 
@@ -340,6 +350,10 @@ class ModulationSourceManager:
             self.vv0_velocity = 0.0
             self.va0_pressure = 0.0
             self.tension_offset = 0.0
+            self.adhesion_is_stuck = False
+            self.adhesion_bond_timer = 0.0
+            self.adhesion_level = 0.0
+            self.adhesion_stage = 'idle'
             self.impulse_vel = 0.0
             self.impulse_pos = 0.0
             self.kinetic_impact_level = 0.0
@@ -356,8 +370,6 @@ class ModulationSourceManager:
             self._last_cache_update_time = current_time
 
         delta_motion = primary_motion_value - self.last_motion_value
-        
-        # Ensure delta_time is sane to prevent division by zero or explosion
         safe_dt = max(delta_time, 0.001)
 
         raw_velocity = delta_motion / safe_dt
@@ -403,20 +415,15 @@ class ModulationSourceManager:
         store.set_source("Primary Motion: Acceleration", normalized_accel)
         store.set_source("Primary Motion: Velocity", self.smoothed_velocity)
 
-        # --- Internal: Directional Bias ---
         bias_param = live.get('motion_directional_bias', 0.0)
         directional_bias_signal = (1.0 + (bias_param * self.smoothed_velocity)) / 2.0
         store.set_source("Internal: Directional Bias", np.clip(directional_bias_signal, 0.0, 1.0))
-        # ----------------------------------
 
-        # --- Differential Potential (Edge Detection) ---
         l_vol = self.app_context.live_motor_volume_left
         r_vol = self.app_context.live_motor_volume_right
         diff_potential = abs(l_vol - r_vol)
         store.set_source("Internal: Differential Potential", np.clip(diff_potential, 0.0, 1.0))
-        # -----------------------------------------------
 
-        # --- Directional Logic (Anisotropic Haptics) ---
         dir_slew_s = max(live.get('motion_direction_slew_s', 0.1), 0.01)
         dir_deadzone = live.get('motion_direction_deadzone', 0.001)
 
@@ -435,19 +442,15 @@ class ModulationSourceManager:
 
         store.set_source("Primary Motion: Direction (Uni)", self._direction_current_val)
         store.set_source("Primary Motion: Direction (Bi)", (self._direction_current_val * 2.0) - 1.0)
-        # -----------------------------------------------
 
-        # --- Kinetic Impact Logic (Collision Detection) ---
         impact_threshold = live.get('impact_threshold', 0.2)
         impact_decay = live.get('impact_decay_s', 0.25)
         zone_size = live.get('impact_zone_size', 0.05)
 
-        # Decay toward zero
         if self.kinetic_impact_level > 0.0:
             decay_rate = 1.0 / max(impact_decay, 0.01)
             self.kinetic_impact_level = max(0.0, self.kinetic_impact_level - decay_rate * safe_dt)
 
-        # Edge Detection
         hit_bottom = (primary_motion_value < zone_size) and (raw_velocity < -impact_threshold)
         hit_top = (primary_motion_value > (1.0 - zone_size)) and (raw_velocity > impact_threshold)
         is_impacting = hit_bottom or hit_top
@@ -459,7 +462,6 @@ class ModulationSourceManager:
             self._was_in_impact_zone = False
         
         store.set_source("Internal: Kinetic Impact", self.kinetic_impact_level)
-        # --------------------------------------------------
 
         self._synthesize_virtual_axes(
             primary_motion_value, normalized_speed, acceleration, jolt, 
@@ -469,6 +471,7 @@ class ModulationSourceManager:
         self._update_spatial_thermodynamics(primary_motion_value, normalized_speed, safe_dt)
         self._update_somatic_state(safe_dt, normalized_speed, normalized_accel)
         self._update_tension_physics(safe_dt, delta_motion)
+        self._update_adhesion_physics(safe_dt, normalized_speed, normalized_accel)
         self._update_motion_span(primary_motion_value, current_time)
         self._update_motion_cycle_randomizer(primary_motion_value)
 
@@ -476,63 +479,88 @@ class ModulationSourceManager:
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
 
+    def _update_adhesion_physics(self, delta_time: float, norm_speed: float, norm_accel: float):
+        """Calculates the Stick-Slip (Adhesion) physics transient."""
+        live = self.config.live_params
+        threshold = live.get('adhesion_velocity_threshold', 0.02)
+        stick_duration = live.get('adhesion_stick_duration', 0.1)
+        magnitude = live.get('adhesion_snap_magnitude', 1.0)
+        attack_s = live.get('adhesion_attack_s', 0.01)
+        decay_s = live.get('adhesion_decay_s', 0.05)
+
+        if norm_speed < threshold:
+            self.adhesion_bond_timer += delta_time
+            if self.adhesion_bond_timer >= stick_duration:
+                self.adhesion_is_stuck = True
+        else:
+            if self.adhesion_is_stuck:
+                self.adhesion_is_stuck = False
+                self.adhesion_stage = 'attack'
+                # Scale the snap magnitude by the acceleration of the breakaway
+                self.adhesion_target_level = magnitude * max(0.1, norm_accel)
+            self.adhesion_bond_timer = 0.0
+
+        if self.adhesion_stage == 'attack':
+            attack_rate = self.adhesion_target_level / max(attack_s, 0.001)
+            self.adhesion_level += attack_rate * delta_time
+            if self.adhesion_level >= self.adhesion_target_level:
+                self.adhesion_level = self.adhesion_target_level
+                self.adhesion_stage = 'decay'
+        elif self.adhesion_stage == 'decay':
+            decay_rate = self.adhesion_target_level / max(decay_s, 0.001)
+            self.adhesion_level -= decay_rate * delta_time
+            if self.adhesion_level <= 0.0:
+                self.adhesion_level = 0.0
+                self.adhesion_stage = 'idle'
+                
+        self.adhesion_level = np.clip(self.adhesion_level, 0.0, 2.0)
+        
+        self.app_context.modulation_source_store.set_source(
+            "Internal: Adhesion Snap", self.adhesion_level
+        )
+
     def _update_spatial_thermodynamics(self, current_pos: float, speed: float, delta_time: float):
         """Calculates 'Internal: Spatial Heat' based on motion history."""
         live = self.config.live_params
         
-        # 1. Resolution & Resizing
         target_res = int(live.get('spatial_heat_resolution', 20))
-        target_res = max(2, min(100, target_res)) # Clamp
+        target_res = max(2, min(100, target_res))
         
         if self.heat_map.shape[0] != target_res:
-            # Resample existing map to new resolution
             old_indices = np.linspace(0, 1, self.heat_map.shape[0])
             new_indices = np.linspace(0, 1, target_res)
             self.heat_map = np.interp(new_indices, old_indices, self.heat_map).astype(np.float32)
 
-        # 2. Decay
         decay_rate = live.get('spatial_heat_decay', 0.05)
         self.heat_map -= decay_rate * delta_time
         
-        # 3. Heat Injection
         attack = live.get('spatial_heat_attack', 0.1)
         heat_amount = attack * 50.0 * speed * delta_time
         
-        # Teleport protection
         delta_pos = current_pos - self.last_motion_value
         if abs(delta_pos) > 0.5:
-            # Jumped -> only heat current
             idx = int(current_pos * (target_res - 1))
             idx = np.clip(idx, 0, target_res - 1)
             self.heat_map[idx] += heat_amount
         else:
-            # Heat path
             p1 = self.last_motion_value
             p2 = current_pos
-            if p1 > p2: p1, p2 = p2, p1 # Ensure sorted
+            if p1 > p2: p1, p2 = p2, p1 
             
             idx_start = int(p1 * (target_res - 1))
-            idx_end = int(p2 * (target_res - 1)) + 1 # +1 for slice inclusion
+            idx_end = int(p2 * (target_res - 1)) + 1 
             
-            # Clamp indices
             idx_start = max(0, idx_start)
             idx_end = min(target_res, idx_end)
             
             self.heat_map[idx_start:idx_end] += heat_amount
 
-        # 4. Clamp
         np.clip(self.heat_map, 0.0, 1.0, out=self.heat_map)
         
-        # 5. Output Sampling
-        # Map 0.0-1.0 position to array index space
         float_idx = current_pos * (target_res - 1)
-        
-        # Linear interpolation from array
         val = float(np.interp(float_idx, np.arange(target_res), self.heat_map))
         
-        # 6. Smoothing (1-pole LPF)
         smoothing = live.get('spatial_heat_smoothing', 0.1)
-        # Smoothing parameter acts as a lag amount (0.0=instant, 0.99=very slow)
         alpha = 1.0 - np.clip(smoothing, 0.0, 0.99)
         
         self.spatial_heat_output += (val - self.spatial_heat_output) * alpha
@@ -542,21 +570,16 @@ class ModulationSourceManager:
         )
 
     def _update_spatial_texture(self, position: float, raw_velocity: float):
-        """
-        Calculates the 'Internal: Spatial Texture' source.
-        Supports both procedural (density-based) and custom (lookup-based) generation.
-        """
+        """Calculates the 'Internal: Spatial Texture' source."""
         live = self.config.live_params
         waveform = live.get('spatial_texture_waveform', 'sine')
 
         if waveform == 'custom':
             curve = live.get('spatial_texture_map_custom', [[0.0, 0.5], [1.0, 0.5]])
-            # Safety check on curve format
             if not isinstance(curve, list) or len(curve) < 2:
                  curve = [[0.0, 0.5], [1.0, 0.5]]
             
             pts = np.array(curve)
-            # Use linear interpolation for the custom map lookup
             try:
                 final_val = float(np.interp(position, pts[:, 0], pts[:, 1]))
             except Exception:
@@ -567,22 +590,17 @@ class ModulationSourceManager:
             )
             return
 
-        # --- Standard Procedural Logic ---
         density = live.get('spatial_texture_density', 20.0)
-        
-        # Calculate instantaneous texture frequency (Hz)
         texture_freq = abs(raw_velocity) * density
         
-        # Safety Fade Logic (Anti-Aliasing)
         fade_start_hz = 40.0
-        fade_end_hz = 60.0 # Relaxed slightly past Nyquist to allow natural alias-blur
+        fade_end_hz = 60.0 
         
         if texture_freq >= fade_end_hz:
             fade_factor = 0.0
         elif texture_freq <= fade_start_hz:
             fade_factor = 1.0
         else:
-            # Linear fade from 1.0 to 0.0
             fade_factor = 1.0 - ((texture_freq - fade_start_hz) / (fade_end_hz - fade_start_hz))
             
         if fade_factor <= 0.001:
@@ -591,24 +609,19 @@ class ModulationSourceManager:
             )
             return
 
-        # Calculate Phase (Distance-based)
         phase_normalized = (position * density) % 1.0
         
         raw_val = 0.0
         if waveform == 'sine':
-            # Unipolar Sine: (sin(2pi * p) + 1) / 2
             raw_val = (math.sin(phase_normalized * 2 * math.pi) + 1.0) / 2.0
         elif waveform == 'triangle':
-            # Unipolar Triangle: 0 -> 1 -> 0
             if phase_normalized < 0.5:
                 raw_val = 2.0 * phase_normalized
             else:
                 raw_val = 2.0 * (1.0 - phase_normalized)
         elif waveform == 'sawtooth':
-            # Unipolar Sawtooth: 0 -> 1
             raw_val = phase_normalized
         elif waveform == 'square':
-            # Unipolar Square: 1 if < 0.5 else 0
             raw_val = 1.0 if phase_normalized < 0.5 else 0.0
             
         final_val = raw_val * fade_factor
@@ -618,90 +631,62 @@ class ModulationSourceManager:
         )
 
     def _update_motion_cycle_randomizer(self, current_pos: float):
-        """
-        Implements a Peak/Valley detection state machine with hysteresis.
-        Triggers a random value change only when the motion explicitly turns around.
-        """
+        """Implements a Peak/Valley detection state machine with hysteresis."""
         hysteresis = self.config.live_params.get('motion_cycle_hysteresis', 0.02)
         
-        # 1. State Machine
         if self._mcr_trend_is_up:
-            # We are moving UP. Track the peak.
             if current_pos > self._mcr_last_extreme:
                 self._mcr_last_extreme = current_pos
-            
-            # Check for turn-around (Down)
             if current_pos < (self._mcr_last_extreme - hysteresis):
-                # Trigger Event: Turned Down
                 self._mcr_trend_is_up = False
-                self._mcr_last_extreme = current_pos # Reset extreme to current valley
+                self._mcr_last_extreme = current_pos 
                 self._mcr_current_value = random.random()
         else:
-            # We are moving DOWN. Track the valley.
             if current_pos < self._mcr_last_extreme:
                 self._mcr_last_extreme = current_pos
-            
-            # Check for turn-around (Up)
             if current_pos > (self._mcr_last_extreme + hysteresis):
-                # Trigger Event: Turned Up
                 self._mcr_trend_is_up = True
-                self._mcr_last_extreme = current_pos # Reset extreme to current peak
+                self._mcr_last_extreme = current_pos 
                 self._mcr_current_value = random.random()
 
-        # 2. Output
         self.app_context.modulation_source_store.set_source(
             "Internal: Motion Cycle Random", self._mcr_current_value
         )
 
     def _update_motion_span(self, current_pos: float, current_time: float):
-        """
-        Calculates the peak-to-peak amplitude (range) of the current motion.
-        Uses a state machine to track local Min/Max and updates the target
-        span value at turnaround points. Implements decay for safety.
-        """
+        """Calculates the peak-to-peak amplitude (range) of the current motion."""
         hysteresis = 0.01
         
-        # 0. Initialize on first frame of activity to prevent startup spike
         if not self._span_initialized:
             self._span_min_tracker = current_pos
             self._span_max_tracker = current_pos
             self._span_last_turnaround_time = current_time
             self._span_initialized = True
-            # Don't return, let it track extremes immediately
 
-        # 1. Track Extremes
         if current_pos > self._span_max_tracker:
             self._span_max_tracker = current_pos
         if current_pos < self._span_min_tracker:
             self._span_min_tracker = current_pos
 
-        # 2. Detect Direction Flip (Turnaround)
         if self._span_is_moving_up and (current_pos < self._span_max_tracker - hysteresis):
-            # Top Turnaround Detected
             self._span_target_value = self._span_max_tracker - self._span_min_tracker
             self._span_min_tracker = current_pos
             self._span_is_moving_up = False
             self._span_last_turnaround_time = current_time
             
         elif not self._span_is_moving_up and (current_pos > self._span_min_tracker + hysteresis):
-            # Bottom Turnaround Detected
             self._span_target_value = self._span_max_tracker - self._span_min_tracker
             self._span_max_tracker = current_pos
             self._span_is_moving_up = True
             self._span_last_turnaround_time = current_time
 
-        # 3. Decay Logic (Safety)
-        # If no turnaround is detected for a while, decay the target value to 0.
         decay_time = self.config.live_params.get('motion_span_decay_s', 3.0)
         time_since_last = current_time - self._span_last_turnaround_time
         if time_since_last > decay_time:
-            # Linear decay
-            decay_rate = 1.0 / 2.0  # Lose full span over 2 seconds once decay starts
-            dt = 1.0/60.0 # Approximate delta time for this loop
+            decay_rate = 1.0 / 2.0 
+            dt = 1.0/60.0 
             self._span_target_value = max(0.0, self._span_target_value - (decay_rate * dt))
 
-        # 4. Output Smoothing
-        # Heavy smoothing to glide between stepped updates
         self._span_current_smoothed += (self._span_target_value - self._span_current_smoothed) * 0.1
         
         final_val = np.clip(self._span_current_smoothed, 0.0, 1.0)
