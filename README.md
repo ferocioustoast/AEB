@@ -46,7 +46,7 @@ AEB's core principle is to use **Input Sources** to generate normalized control 
 
 #### Easiest Method: Executable (Windows Only)
 1.  **(Optional)** If you plan to use the X360 Controller input, download and install the [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases/latest).
-2.  Download the latest **AEB executable** from the project's Releases page.
+2.  Download the latest [**AEB executable** from the project's Releases page](https://github.com/ferocioustoast/AEB/releases/latest).
 3.  Run the executable.
 
 #### Recommended Method: Python (All Platforms, Latest Updates)
