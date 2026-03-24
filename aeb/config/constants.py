@@ -18,6 +18,56 @@ NORMALIZED_MIDPOINT: float = 0.5
 TCODE_PATTERN: re.Pattern = re.compile(r"([LRVA])([0-9])([0-9]{2})")
 BIPOLAR_AXES: set[str] = {"L1", "L2", "R0", "R1", "R2", "V-R0", "V-A0"}
 
+# --- Modulation Source Documentation ---
+
+MODULATION_SOURCE_TOOLTIPS = {
+    "TCode: L0": "Direct hardware/script input (0.0-1.0) from a T-Code compatible device.",
+    "TCode: L1": "Direct hardware/script input for side-to-side motion. Bipolar (-1.0 to 1.0).",
+    "TCode: L2": "Direct hardware/script input for forward/backward motion. Bipolar (-1.0 to 1.0).",
+    "TCode: R0": "Direct hardware/script input for twist motion. Bipolar (-1.0 to 1.0).",
+    "TCode: R1": "Direct hardware/script input for roll motion. Bipolar (-1.0 to 1.0).",
+    "TCode: R2": "Direct hardware/script input for pitch motion. Bipolar (-1.0 to 1.0).",
+    "TCode: V0": "Direct hardware/script input for vibration. Unipolar (0.0-1.0).",
+    "TCode: A0": "Direct hardware/script input for an auxiliary axis. Unipolar (0.0-1.0).",
+    "TCode: A1": "Direct hardware/script input for an auxiliary axis. Unipolar (0.0-1.0).",
+    "TCode: A2": "Direct hardware/script input for an auxiliary axis. Unipolar (0.0-1.0).",
+    "TCode: V-R0": "Physics-simulated reflexive twist derived from motion Acceleration. Bipolar.",
+    "TCode: V-L1": "Physics-simulated lateral inertia/wobble. Centered at 0.5 (Rest).",
+    "TCode: V-V0": "Physics-simulated texture/grit derived from motion Jolt (change in acceleration).",
+    "TCode: V-A0": "Physics-simulated pneumatics. Negative = Compression, Positive = Suction. Bipolar.",
+    "Screen Flow: Position": "A clean sine wave phase-locked to the detected video rhythm.",
+    "Screen Flow: Rhythm": "The normalized tempo (0.0-1.0) of the dominant on-screen motion.",
+    "Screen Flow: Intensity": "The normalized amplitude (0.0-1.0) of the dominant on-screen motion.",
+    "Internal: Loop": "The output of the internal automatic motion generator (0.0 to 1.0).",
+    "Internal: X360 Small Motor": "The raw rumble value (0.0-1.0) from the virtual X360 controller's small motor.",
+    "Internal: X360 Large Motor": "The raw rumble value (0.0-1.0) from the virtual X360 controller's large motor.",
+    "Internal: Time": "A slow-moving linear ramp (0.0 to 1.0) over a configurable period.",
+    "Internal: Random": "A stepped random value that updates at a configurable rate.",
+    "Internal: Drift": "A smooth, non-repeating, organic signal (fractal noise) that wanders over time.",
+    "Internal: Primary Motion Driver": "A modulation target that can override the main panner. As a source, it reflects its own output.",
+    "Internal: Left Channel Output Level": "The real-time final volume of the left audio channel, measured by an envelope follower.",
+    "Internal: Right Channel Output Level": "The real-time final volume of the right audio channel, measured by an envelope follower.",
+    "Internal: System Excitation": "Represents total session 'Heat'. Rises with fast motion, holds during pauses, and decays slowly.",
+    "Internal: Kinetic Stress": "Represents 'Friction' or mechanical load. Spikes during sudden acceleration.",
+    "Internal: Spatial Heat": "Localized heat/friction at the current position. Rises when rubbing one spot.",
+    "Internal: Tension": "Magnitude of skin stretch/drag. Rises with movement and holds during pauses (static friction).",
+    "Internal: Shear": "Directional skin stretch. Bipolar (-1.0 to 1.0). Holds during pauses.",
+    "Internal: Adhesion Snap": "A sharp, decaying transient triggered by breaking static friction after a pause.",
+    "Internal: Motion Span": "The peak-to-peak amplitude (travel length) of the current motion.",
+    "Internal: Motion Cycle Random": "A 'Sample & Hold' random value that updates only when motion direction reverses.",
+    "Internal: Differential Potential": "Represents stereo divergence. 0.0 = Center, 1.0 = Edge.",
+    "Internal: Directional Bias": "A normalized signal (0.0-1.0) representing directional weight, based on velocity.",
+    "Internal: Spatial Texture": "An oscillating signal locked to position, not time. Simulates physical surface features.",
+    "Internal: Transient Impulse": "A physics-based 'ripple' that triggers on jolt/impact.",
+    "Internal: Kinetic Impact": "A physics-based 'thud' representing collision forces at the motion limits (0.0/1.0).",
+    "Primary Motion: Position": "The final, authoritative 0.0-1.0 signal driving the Global Panner.",
+    "Primary Motion: Velocity": "The signed speed of the primary motion. Bipolar (-1.0 to 1.0).",
+    "Primary Motion: Speed": "The absolute speed (magnitude) of the primary motion.",
+    "Primary Motion: Acceleration": "The real-time, normalized acceleration of the primary motion.",
+    "Primary Motion: Direction (Uni)": "Indicates direction of travel (0.0 or 1.0). Latches its state during pauses.",
+    "Primary Motion: Direction (Bi)": "Bipolar version of Direction (Uni) (-1.0 or 1.0). Latches state."
+}
+
 
 # --- Default Waveform Configuration ---
 

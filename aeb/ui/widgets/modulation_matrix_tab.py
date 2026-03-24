@@ -7,13 +7,14 @@ import re
 from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import Qt, QEvent
+from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDoubleSpinBox,
     QHeaderView, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
     QPushButton, QStackedWidget, QTableWidget, QVBoxLayout, QWidget
 )
 
-from aeb.config.constants import DEFAULT_SETTINGS
+from aeb.config.constants import DEFAULT_SETTINGS, MODULATION_SOURCE_TOOLTIPS
 from aeb.ui.widgets.dialogs import ConditionsDialog, GenericCurveEditorDialog
 
 if TYPE_CHECKING:
@@ -116,8 +117,7 @@ class ModulationMatrixTab(QWidget):
     def _setup_table_columns(self):
         """Sets the column count, headers, and resize modes for the table."""
         self.mod_matrix_table.setColumnCount(9)
-        self.mod_matrix_table.setHorizontalHeaderLabels(
-            ["Enabled", "Source", "Target", "Amount", "Mode", "Curve", "Clamp Min", "Clamp Max", "Conditions"])
+        self.mod_matrix_table.setHorizontalHeaderLabels(["Enabled", "Source", "Target", "Amount", "Mode", "Curve", "Clamp Min", "Clamp Max", "Conditions"])
         header = self.mod_matrix_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -172,11 +172,29 @@ class ModulationMatrixTab(QWidget):
         return widget
 
     def _create_source_widget(self, row: int, rule: dict, sources: list) -> QComboBox:
-        """Creates the 'Source' combobox widget for a row."""
+        """Creates the 'Source' combobox with integrated tooltips."""
         source_combo = QComboBox()
-        source_combo.setToolTip("The input signal driving this rule (e.g., T-Code L0, LFO, Random).")
-        source_combo.addItems(sources)
+        source_combo.setToolTip("The input signal driving this rule.")
+        
+        model = QStandardItemModel()
+        for source_name in sources:
+            item = QStandardItem(source_name)
+            tooltip = MODULATION_SOURCE_TOOLTIPS.get(source_name, f"Source: {source_name}")
+            
+            # Special handling for dynamic sources not in the static dict
+            if source_name.startswith("System LFO:"):
+                tooltip = "Output of a user-defined System LFO."
+            elif source_name.startswith("Hotkey:"):
+                tooltip = "State (Pressed/Released) of a user-defined Scene Hotkey."
+            elif source_name.startswith("State."):
+                tooltip = "Value of a custom, user-defined state variable."
+            elif source_name.startswith("Audio Input:"):
+                tooltip = "Real-time audio level from a named analysis channel."
 
+            item.setData(tooltip, Qt.ToolTipRole)
+            model.appendRow(item)
+        
+        source_combo.setModel(model)
         source_text = rule.get('source', '')
         index = source_combo.findText(source_text)
         if index != -1:
@@ -247,18 +265,18 @@ class ModulationMatrixTab(QWidget):
 
         elif category_name == 'Master':
             new_items = ['left_amplitude', 'right_amplitude', 'ambient_amplitude',
-                       'ambient_panning_link_enabled', 'stereo_width', 'pan_offset',
-                       'panning_law', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol',
-                       'spatial_phase_offset', 'safety_attack_time']
+                         'ambient_panning_link_enabled', 'stereo_width', 'pan_offset',
+                         'panning_law', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol',
+                         'spatial_phase_offset', 'safety_attack_time']
         elif category_name == 'Ramping':
             new_items = ['ramp_up_enabled', 'ramp_up_time', 'ramp_down_enabled', 'ramp_down_time',
-                        'idle_time_before_ramp_down', 'long_idle_enabled',
-                        'long_idle_trigger_time', 'long_idle_initial_amp', 'long_idle_ramp_time']
+                         'idle_time_before_ramp_down', 'long_idle_enabled',
+                         'long_idle_trigger_time', 'long_idle_initial_amp', 'long_idle_ramp_time']
         elif category_name == 'Loop':
             new_items = ['motion_type', 'time_s', 'min_range', 'max_range', 'randomize_loop_speed',
-                     'randomize_loop_range', 'loop_speed_fastest', 'loop_speed_ramp_time_min',
-                     'loop_speed_interval_sec', 'loop_range_interval_min_s',
-                     'loop_range_interval_max_s', 'loop_range_transition_time_s', 'slowest_loop_speed']
+                         'randomize_loop_range', 'loop_speed_fastest', 'loop_speed_ramp_time_min',
+                         'loop_speed_interval_sec', 'loop_range_interval_min_s',
+                         'loop_range_interval_max_s', 'loop_range_transition_time_s', 'slowest_loop_speed']
         elif category_name == 'Zonal':
             new_items = ['pressure']
         elif category_name == 'System LFO':
@@ -288,7 +306,7 @@ class ModulationMatrixTab(QWidget):
                 'somatic_excitation_buildup_s', 'somatic_excitation_decay_s',
                 'somatic_excitation_cooldown_s', 'somatic_stress_attack_s',
                 'somatic_stress_release_s',
-                'adhesion_velocity_threshold', 'adhesion_stick_duration',
+                'adhesion_velocity_threshold', 'adhesion_stick_duration', 
                 'adhesion_snap_magnitude', 'adhesion_attack_s', 'adhesion_decay_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
                 'impulse_gain_spinbox', 'input_inertia',
@@ -673,7 +691,6 @@ class ModulationMatrixTab(QWidget):
         layout.addWidget(curve_combo)
         layout.addWidget(edit_btn)
         
-        # Connect signals
         curve_combo.currentTextChanged.connect(lambda text, r=row: self._on_mod_rule_changed(r, 'curve', text))
         curve_combo.currentTextChanged.connect(lambda text: edit_btn.setVisible(text == 'custom'))
         edit_btn.clicked.connect(lambda checked=False, r=row: self._handle_edit_custom_curve(r))
@@ -688,7 +705,6 @@ class ModulationMatrixTab(QWidget):
             mod_matrix = self.app_context.config.get_active_scene_dict()['modulation_matrix']
             rule = mod_matrix[row]
             
-            # Retrieve existing data or default to linear 0-1
             current_data = rule.get('custom_curve_data', [[0.0, 0.0], [1.0, 1.0]])
             
             dialog = GenericCurveEditorDialog(
