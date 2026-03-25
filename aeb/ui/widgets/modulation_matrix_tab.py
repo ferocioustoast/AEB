@@ -310,7 +310,9 @@ class ModulationMatrixTab(QWidget):
                 'adhesion_snap_magnitude', 'adhesion_attack_s', 'adhesion_decay_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
                 'impulse_gain_spinbox', 'input_inertia',
-                'impact_threshold', 'impact_decay_s', 'impact_zone_size'
+                'impact_threshold', 'impact_decay_s', 'impact_zone_size',
+                'trance_memory_strokes', 'trance_tolerance_pct',
+                'trance_immersion_rate', 'trance_shatter_rate', 'trance_timeout_factor'
             ]
         
         elif category_name == 'MotionFeel':

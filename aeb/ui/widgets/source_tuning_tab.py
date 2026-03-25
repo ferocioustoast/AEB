@@ -78,6 +78,7 @@ class SourceTuningTab(QWidget):
             "Somatic State Engine": self._create_somatic_state_engine_group(),
             "Spatial Thermodynamics (Heatmap)": self._create_spatial_thermodynamics_group(),
             "Drift & Internal Generative": self._create_drift_group(),
+            "Rhythmic Entrainment (Cadence Lock)": self._create_rhythmic_entrainment_group(),
             "Spatial Texture (Distance-Based)": self._create_spatial_texture_group(),
             "Viscoelastic Skin Physics": self._create_viscoelastic_physics_group(),
             "Stick-Slip Physics (Adhesion)": self._create_adhesion_physics_group(),
@@ -123,6 +124,12 @@ class SourceTuningTab(QWidget):
 
         self.drift_speed_spinbox.setValue(cfg.get('internal_drift_speed'))
         self.drift_octaves_spinbox.setValue(cfg.get('internal_drift_octaves'))
+        
+        self.trance_memory_strokes_spinbox.setValue(cfg.get('trance_memory_strokes'))
+        self.trance_tolerance_pct_spinbox.setValue(cfg.get('trance_tolerance_pct'))
+        self.trance_immersion_rate_spinbox.setValue(cfg.get('trance_immersion_rate'))
+        self.trance_shatter_rate_spinbox.setValue(cfg.get('trance_shatter_rate'))
+        self.trance_timeout_factor_spinbox.setValue(cfg.get('trance_timeout_factor'))
         
         self.st_density_spinbox.setValue(cfg.get('spatial_texture_density', 20.0))
         current_wave = cfg.get('spatial_texture_waveform', 'sine')
@@ -201,6 +208,12 @@ class SourceTuningTab(QWidget):
 
         self.drift_speed_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_speed', v))
         self.drift_octaves_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_octaves', v))
+        
+        self.trance_memory_strokes_spinbox.valueChanged.connect(lambda v: mwu('trance_memory_strokes', v))
+        self.trance_tolerance_pct_spinbox.valueChanged.connect(lambda v: mwu('trance_tolerance_pct', v))
+        self.trance_immersion_rate_spinbox.valueChanged.connect(lambda v: mwu('trance_immersion_rate', v))
+        self.trance_shatter_rate_spinbox.valueChanged.connect(lambda v: mwu('trance_shatter_rate', v))
+        self.trance_timeout_factor_spinbox.valueChanged.connect(lambda v: mwu('trance_timeout_factor', v))
         
         self.st_density_spinbox.valueChanged.connect(lambda v: mwu('spatial_texture_density', v))
         self.st_waveform_combo.currentTextChanged.connect(self._on_st_waveform_changed)
@@ -290,6 +303,37 @@ class SourceTuningTab(QWidget):
         self.adhesion_decay_s_spinbox.setToolTip("How quickly the snap sensation fades back to zero.")
         layout.addRow("Snap Decay:", self.adhesion_decay_s_spinbox)
         
+        return group
+
+    def _create_rhythmic_entrainment_group(self) -> QWidget:
+        """Creates the settings panel for the Rhythmic Trance Engine."""
+        group = QGroupBox("Rhythmic Entrainment Engine (Cadence Lock)")
+        group.setToolTip(
+            "Monitors the temporal consistency of Primary Motion.\n"
+            "Rewards steady rhythms with a modulation source ('Internal: Rhythmic Trance')."
+        )
+        layout = QFormLayout(group)
+
+        self.trance_memory_strokes_spinbox = QSpinBox(minimum=2, maximum=10)
+        self.trance_memory_strokes_spinbox.setToolTip("Number of half-strokes used to calculate variance.")
+        layout.addRow("Memory Strokes:", self.trance_memory_strokes_spinbox)
+
+        self.trance_tolerance_pct_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.5, singleStep=0.05)
+        self.trance_tolerance_pct_spinbox.setToolTip("Allowed % deviation from mean duration to maintain Lock.")
+        layout.addRow("Tolerance (Variance):", self.trance_tolerance_pct_spinbox)
+
+        self.trance_immersion_rate_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=10.0, singleStep=0.5, suffix=" s")
+        self.trance_immersion_rate_spinbox.setToolTip("Seconds of perfect lock required to reach 1.0 output.")
+        layout.addRow("Immersion Rate (Attack):", self.trance_immersion_rate_spinbox)
+
+        self.trance_shatter_rate_spinbox = QDoubleSpinBox(decimals=1, minimum=0.1, maximum=10.0, singleStep=0.5, suffix=" s")
+        self.trance_shatter_rate_spinbox.setToolTip("Seconds required to return to 0.0 when rhythm is broken.")
+        layout.addRow("Shatter Rate (Release):", self.trance_shatter_rate_spinbox)
+
+        self.trance_timeout_factor_spinbox = QDoubleSpinBox(decimals=1, minimum=1.1, maximum=5.0, singleStep=0.1)
+        self.trance_timeout_factor_spinbox.setToolTip("Multiplier of mean duration before a pause breaks the trance.")
+        layout.addRow("Timeout Factor:", self.trance_timeout_factor_spinbox)
+
         return group
 
     def _create_spatial_thermodynamics_group(self) -> QWidget:

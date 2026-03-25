@@ -403,7 +403,7 @@ class ModulationEngine:
         ctx = self.app_context
         live_params_update = {}
 
-        source_tuning_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS if k.startswith(('internal_', 'spatial_', 'env_', 'motion_', 'intensity_', 'vas_', 'somatic_', 'impulse_'))}
+        source_tuning_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS if k.startswith(('internal_', 'spatial_', 'env_', 'motion_', 'intensity_', 'vas_', 'somatic_', 'impulse_', 'trace_'))}
         source_tuning_eff, _ = apply_modulations_to_parameters(ctx, "Source Tuning", source_tuning_base, activation_levels, unified_sources, mod_matrix_override=effective_matrix)
         live_params_update.update(source_tuning_eff)
 

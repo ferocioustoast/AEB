@@ -615,7 +615,7 @@ class MainController(QObject):
                 "Internal: Motion Cycle Random", "Internal: Differential Potential",
                 "Internal: Kinetic Impact", "Internal: Spatial Texture",
                 "Internal: Directional Bias", "Internal: Spatial Heat",
-                "Internal: Adhesion Snap"
+                "Internal: Adhesion Snap", "Internal: Rhythmic Trance"
             )
             for rule in self.app_context.config.get('modulation_matrix', []):
                 if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):

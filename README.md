@@ -18,7 +18,7 @@ This program generates audio signals intended to control high-voltage e-stim har
 
 ### ⚛️ Virtual Axis & Somatic Physics
 *   **Virtual Axis Synthesis (VAS):** Derives multi-dimensional sensations—like **Twist, Pressure, and Pneumatics**—from a single 1D motion input using real-time derivative analysis.
-*   **Somatic State Modeling:** The engine tracks conceptual physical states like **Kinetic Stress** (friction spikes), **System Excitation** (session "heat"), and **Transient Impulses** (virtual ripple physics).
+*   **Somatic State Modeling:** The engine tracks conceptual physical states like **Kinetic Stress** (friction spikes), **System Excitation** (session "heat"), and **Rhythmic Trance** (temporal consistency and cadence lock).
 *   **Organic Drift Synthesis:** Prevents sensory habituation using a generative fractal engine that produces smooth, non-repeating motion (like wind or tides).
 
 ### 🎮 Intelligence & Control
@@ -104,7 +104,7 @@ For maximum stability and to prevent conflicts with other Python packages, it is
 *   **Servers & TCode:** Enable and configure the WSDM client, UDP server, and Virtual X360 Controller.
 *   **Live Sync:** Controls for real-time synchronization. **Screen Flow** performs rhythmic motion analysis on video content, while **Audio Input Analysis** creates sources from system audio.
 *   **Motion Feel:** The "easy mode" for adding intuitive effects based on both real and synthesized T-Code axes.
-*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **Signal Safety & Integrity**, **System LFOs**, **Drift**, **Spatial Texture**, **Thermodynamics**, **Spatial Thermodynamics** (Heatmap), **Viscoelastic Physics**, **Inertial Mass**, **Pneumatics**, **Kinetic Impact**, **Directional Bias**, and **Primary Motion Dynamics**.
+*   **Source Tuning:** A dedicated tab for advanced, "power-user" configuration of all internal and virtual modulation sources. Includes controls for **Signal Safety & Integrity**, **System LFOs**, **Drift**, **Spatial Texture**, **Thermodynamics**, **Spatial Thermodynamics** (Heatmap), **Viscoelastic Physics**, **Stick-Slip Physics (Adhesion)**, **Inertial Mass**, **Pneumatics**, **Kinetic Impact**, **Directional Bias**, **Rhythmic Entrainment (Cadence Lock)**, and **Primary Motion Dynamics**.
 *   **Modulation Matrix:** The "expert mode" for creating custom, conditional rules to modulate any parameter from any source.
 *   **Volume Ramping:** Fine-tune the automatic fade-in/fade-out behavior.
 *   **Program Launcher:** Configure external programs to launch automatically.

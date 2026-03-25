@@ -60,6 +60,7 @@ MODULATION_SOURCE_TOOLTIPS = {
     "Internal: Spatial Texture": "An oscillating signal locked to position, not time. Simulates physical surface features.",
     "Internal: Transient Impulse": "A physics-based 'ripple' that triggers on jolt/impact.",
     "Internal: Kinetic Impact": "A physics-based 'thud' representing collision forces at the motion limits (0.0/1.0).",
+    "Internal: Rhythmic Trance": "Represents rhythmic consistency. Rises towards 1.0 when motion is steady and predictable; falls to 0.0 when erratic or paused.",
     "Primary Motion: Position": "The final, authoritative 0.0-1.0 signal driving the Global Panner.",
     "Primary Motion: Velocity": "The signed speed of the primary motion. Bipolar (-1.0 to 1.0).",
     "Primary Motion: Speed": "The absolute speed (magnitude) of the primary motion.",
@@ -168,6 +169,9 @@ DEFAULT_SETTINGS: dict = {
 
         # Kinetic Impact (Collision Physics)
         "Internal: Kinetic Impact": 0.0,
+
+        # Rhythmic Trance Engine (Cadence Lock)
+        "Internal: Rhythmic Trance": 0.0,
         
         "Primary Motion: Position": 0.0,
         "Primary Motion: Velocity": 0.0,
@@ -332,6 +336,13 @@ DEFAULT_SETTINGS: dict = {
     'impact_threshold': 0.2,
     'impact_decay_s': 0.25,
     'impact_zone_size': 0.05,
+
+    # Rhythmic Entrainment (Cadence Lock)
+    'trance_memory_strokes': 4,
+    'trance_tolerance_pct': 0.15,
+    'trance_immersion_rate': 2.0,
+    'trance_shatter_rate': 0.5,
+    'trance_timeout_factor': 1.5,
 
     # Motion Feel
     'motion_feel_L1_enabled': False,

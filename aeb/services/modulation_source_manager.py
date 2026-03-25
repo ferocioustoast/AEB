@@ -85,6 +85,14 @@ class ModulationSourceManager:
         self._mcr_trend_is_up: bool = True
         self._mcr_last_extreme: float = 0.0
 
+        # Rhythmic Trance Engine State
+        self._trance_stroke_history = collections.deque(maxlen=4)
+        self._trance_last_turnaround_time: float = 0.0
+        self._trance_is_locked: bool = False
+        self._trance_output_level: float = 0.0
+        self._trance_trend_is_up: bool = True
+        self._trance_last_extreme: float = 0.0
+
         # Viscoelastic Physics Variables
         self.tension_offset: float = 0.0
 
@@ -155,7 +163,7 @@ class ModulationSourceManager:
             "Internal: Kinetic Impact", "Internal: Drift", "Internal: Motion Span", 
             "Internal: Spatial Heat", "Internal: Motion Cycle Random", 
             "Internal: Differential Potential", "Internal: Directional Bias", 
-            "Internal: Spatial Texture"
+            "Internal: Spatial Texture", "Internal: Rhythmic Trance"
         }
 
         self.loop_state = LoopState(last_update_time=self.last_update_time)
@@ -216,6 +224,13 @@ class ModulationSourceManager:
         self._mcr_current_value = 0.5
         self._mcr_trend_is_up = True
         self._mcr_last_extreme = 0.0
+
+        self._trance_stroke_history.clear()
+        self._trance_last_turnaround_time = current_time
+        self._trance_is_locked = False
+        self._trance_output_level = 0.0
+        self._trance_trend_is_up = True
+        self._trance_last_extreme = 0.0
 
         self.motion_speed_history.clear()
         self.motion_accel_history.clear()
@@ -342,6 +357,14 @@ class ModulationSourceManager:
             self._span_initialized = False 
             self._direction_target = 0.5
             self._mcr_last_extreme = 0.0
+            
+            # Reset Trance State
+            self._trance_stroke_history.clear()
+            self._trance_last_turnaround_time = current_time
+            self._trance_is_locked = False
+            self._trance_output_level = 0.0
+            self._trance_trend_is_up = True
+            self._trance_last_extreme = primary_motion_value
             return
 
         if not self._was_motion_active:
@@ -363,6 +386,15 @@ class ModulationSourceManager:
             self._span_target_value = 0.0
             self._span_current_smoothed = 0.0
             self._mcr_last_extreme = primary_motion_value
+            
+            # Reset Trance
+            self._trance_stroke_history.clear()
+            self._trance_last_turnaround_time = current_time
+            self._trance_is_locked = False
+            self._trance_output_level = 0.0
+            self._trance_trend_is_up = True
+            self._trance_last_extreme = primary_motion_value
+            
             self._was_motion_active = True
 
         if current_time - self._last_cache_update_time > self.CACHE_UPDATE_INTERVAL_S:
@@ -474,10 +506,81 @@ class ModulationSourceManager:
         self._update_adhesion_physics(safe_dt, normalized_speed, normalized_accel)
         self._update_motion_span(primary_motion_value, current_time)
         self._update_motion_cycle_randomizer(primary_motion_value)
+        self._update_rhythmic_trance(primary_motion_value, current_time, safe_dt)
 
         self.last_motion_value = primary_motion_value
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
+
+    def _update_rhythmic_trance(self, current_pos: float, current_time: float, delta_time: float):
+        """Monitors motion cadence and calculates the Rhythmic Trance level."""
+        live = self.config.live_params
+        mem_strokes = int(live.get('trance_memory_strokes', 4))
+        
+        if self._trance_stroke_history.maxlen != mem_strokes:
+            self._trance_stroke_history = collections.deque(
+                list(self._trance_stroke_history), maxlen=max(1, mem_strokes)
+            )
+
+        hysteresis = live.get('motion_cycle_hysteresis', 0.02)
+        is_turnaround = False
+        
+        if self._trance_trend_is_up:
+            if current_pos > self._trance_last_extreme:
+                self._trance_last_extreme = current_pos
+            if current_pos < (self._trance_last_extreme - hysteresis):
+                self._trance_trend_is_up = False
+                self._trance_last_extreme = current_pos
+                is_turnaround = True
+        else:
+            if current_pos < self._trance_last_extreme:
+                self._trance_last_extreme = current_pos
+            if current_pos > (self._trance_last_extreme + hysteresis):
+                self._trance_trend_is_up = True
+                self._trance_last_extreme = current_pos
+                is_turnaround = True
+
+        if is_turnaround:
+            duration = current_time - self._trance_last_turnaround_time
+            self._trance_stroke_history.append(duration)
+            self._trance_last_turnaround_time = current_time
+
+        tolerance = live.get('trance_tolerance_pct', 0.15)
+        timeout_factor = live.get('trance_timeout_factor', 1.5)
+        time_since_turnaround = current_time - self._trance_last_turnaround_time
+
+        if len(self._trance_stroke_history) == mem_strokes and mem_strokes > 0:
+            min_dur = min(self._trance_stroke_history)
+            max_dur = max(self._trance_stroke_history)
+            mean_dur = sum(self._trance_stroke_history) / mem_strokes
+
+            if mean_dur > 1e-6:
+                variance_ratio = (max_dur - min_dur) / mean_dur
+                if variance_ratio <= tolerance:
+                    self._trance_is_locked = True
+                else:
+                    self._trance_is_locked = False
+                
+                if time_since_turnaround > (mean_dur * timeout_factor):
+                    self._trance_is_locked = False
+            else:
+                self._trance_is_locked = False
+        else:
+            self._trance_is_locked = False
+
+        immersion_rate = max(live.get('trance_immersion_rate', 2.0), 0.01)
+        shatter_rate = max(live.get('trance_shatter_rate', 0.5), 0.01)
+
+        if self._trance_is_locked:
+            self._trance_output_level += (1.0 / immersion_rate) * delta_time
+        else:
+            self._trance_output_level -= (1.0 / shatter_rate) * delta_time
+
+        self._trance_output_level = float(np.clip(self._trance_output_level, 0.0, 1.0))
+        
+        self.app_context.modulation_source_store.set_source(
+            "Internal: Rhythmic Trance", self._trance_output_level
+        )
 
     def _update_adhesion_physics(self, delta_time: float, norm_speed: float, norm_accel: float):
         """Calculates the Stick-Slip (Adhesion) physics transient."""
