@@ -234,7 +234,7 @@ class MainController(QObject):
                        'motion_feel_R2_enabled', 'motion_feel_VR0_enabled',
                        'motion_feel_VL1_enabled', 'motion_feel_VV0_enabled',
                        'motion_feel_VA0_enabled',
-                       'modulation_matrix']
+                       'modulation_matrix', 'system_lfos']
 
         if setting_key in GLOBAL_CONTEXT_KEYS:
             old_value = getattr(self.app_context, setting_key)
@@ -252,7 +252,7 @@ class MainController(QObject):
             # SCENE/LIVE SETTINGS - CRITICAL LOCKING SECTION
             with self.app_context.live_params_lock:
                 old_value = self.app_context.config.get(setting_key)
-                if old_value == new_value and setting_key != 'modulation_matrix':
+                if old_value == new_value and setting_key not in ['modulation_matrix', 'system_lfos']:
                     return
                 
                 self.app_context.config.set(setting_key, new_value)
@@ -605,22 +605,28 @@ class MainController(QObject):
             'motion_feel_VL1_enabled', 'motion_feel_VV0_enabled',
             'motion_feel_VA0_enabled'
         ]
-        if any(cfg.get(key) for key in motion_feel_keys):
+        
+        lfos = self.app_context.config.get('system_lfos', [])
+        if any(lfo.get('sync_to_motion') for lfo in lfos):
             is_in_use = True
-        else:
-            source_prefixes = (
-                "Primary Motion:", "TCode: V-", "Internal: System Excitation",
-                "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
-                "Internal: Motion Span", "Internal: Transient Impulse",
-                "Internal: Motion Cycle Random", "Internal: Differential Potential",
-                "Internal: Kinetic Impact", "Internal: Spatial Texture",
-                "Internal: Directional Bias", "Internal: Spatial Heat",
-                "Internal: Adhesion Snap", "Internal: Rhythmic Trance"
-            )
-            for rule in self.app_context.config.get('modulation_matrix', []):
-                if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):
-                    is_in_use = True
-                    break
+            
+        if not is_in_use:
+            if any(cfg.get(key) for key in motion_feel_keys):
+                is_in_use = True
+            else:
+                source_prefixes = (
+                    "Primary Motion:", "TCode: V-", "Internal: System Excitation",
+                    "Internal: Kinetic Stress", "Internal: Tension", "Internal: Shear",
+                    "Internal: Motion Span", "Internal: Transient Impulse",
+                    "Internal: Motion Cycle Random", "Internal: Differential Potential",
+                    "Internal: Kinetic Impact", "Internal: Spatial Texture",
+                    "Internal: Directional Bias", "Internal: Spatial Heat",
+                    "Internal: Adhesion Snap", "Internal: Rhythmic Trance"
+                )
+                for rule in self.app_context.config.get('modulation_matrix', []):
+                    if rule.get('enabled') and rule.get('source', '').startswith(source_prefixes):
+                        is_in_use = True
+                        break
 
         with self.app_context._motion_sources_are_in_use_lock:
             self.app_context._motion_sources_are_in_use = is_in_use

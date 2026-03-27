@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLineEdit, QListWidget, QPushButton, QSplitter, QVBoxLayout, QWidget
+    QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QPushButton, QSplitter, QVBoxLayout, QWidget
 )
 
 if TYPE_CHECKING:
@@ -90,16 +90,31 @@ class SystemLfosPanel(QWidget):
             "modulation source (e.g., 'Rhythm' creates 'System LFO: Rhythm').")
         layout.addRow("Name:", self.name_edit)
 
-        self.freq_spinbox = QDoubleSpinBox(
-            decimals=3, minimum=0.001, maximum=100.0, singleStep=0.1, suffix=" Hz")
-        self.freq_spinbox.setToolTip(
-            "The speed of the LFO in cycles per second (Hertz).")
-        layout.addRow("Frequency:", self.freq_spinbox)
-
         self.waveform_combo = QComboBox()
         self.waveform_combo.addItems(['sine', 'square', 'sawtooth', 'triangle'])
         self.waveform_combo.setToolTip("The geometric shape of the LFO's wave.")
         layout.addRow("Waveform:", self.waveform_combo)
+
+        self.sync_checkbox = QCheckBox("Sync to Motion (Phase-Locked Loop)")
+        self.sync_checkbox.setToolTip("Synchronize the LFO frequency to the sweep rate.")
+        layout.addRow(self.sync_checkbox)
+
+        self.sync_mult_spinbox = QDoubleSpinBox(
+            decimals=2, minimum=0.1, maximum=16.0, singleStep=0.5)
+        self.sync_mult_spinbox.setToolTip("Frequency ratio relative to sweep speed (e.g., 2.0 = two pulses per sweep).")
+        self.sync_mult_label = QLabel("Sync Multiplier:")
+        layout.addRow(self.sync_mult_label, self.sync_mult_spinbox)
+
+        self.sync_inertia_spinbox = QDoubleSpinBox(
+            decimals=1, minimum=0.1, maximum=10.0, singleStep=0.5)
+        self.sync_inertia_spinbox.setToolTip("Tracking lag. Higher values cause the LFO to take longer to adjust to new tempos.")
+        self.sync_inertia_label = QLabel("Sync Inertia:")
+        layout.addRow(self.sync_inertia_label, self.sync_inertia_spinbox)
+
+        self.freq_spinbox = QDoubleSpinBox(
+            decimals=3, minimum=0.001, maximum=100.0, singleStep=0.1, suffix=" Hz")
+        self.freq_label = QLabel("Frequency (Hz):")
+        layout.addRow(self.freq_label, self.freq_spinbox)
 
         self.phase_offset_spinbox = QDoubleSpinBox(
             decimals=3, minimum=0.0, maximum=1.0, singleStep=0.05)
@@ -130,14 +145,22 @@ class SystemLfosPanel(QWidget):
 
         self.name_edit.editingFinished.connect(
             lambda: self._on_inspector_value_changed('name', self.name_edit.text()))
-        self.freq_spinbox.valueChanged.connect(
-            lambda v: self._on_inspector_value_changed('frequency', v))
         self.waveform_combo.currentTextChanged.connect(
             lambda t: self._on_inspector_value_changed('waveform', t))
+        self.sync_checkbox.toggled.connect(
+            lambda v: self._on_inspector_value_changed('sync_to_motion', v))
+        self.sync_mult_spinbox.valueChanged.connect(
+            lambda v: self._on_inspector_value_changed('sync_multiplier', v))
+        self.sync_inertia_spinbox.valueChanged.connect(
+            lambda v: self._on_inspector_value_changed('sync_inertia', v))
+        self.freq_spinbox.valueChanged.connect(
+            lambda v: self._on_inspector_value_changed('frequency', v))
         self.phase_offset_spinbox.valueChanged.connect(
             lambda v: self._on_inspector_value_changed('phase_offset', v))
         self.randomness_spinbox.valueChanged.connect(
             lambda v: self._on_inspector_value_changed('randomness', v))
+        
+        self.sync_checkbox.toggled.connect(self._update_ui_state)
 
     @Slot(int)
     def _populate_inspector(self, index: int):
@@ -155,12 +178,33 @@ class SystemLfosPanel(QWidget):
         with self.main_window._block_signals(self.inspector_panel):
             lfo = lfos[index]
             self.name_edit.setText(lfo.get('name', ''))
-            self.freq_spinbox.setValue(lfo.get('frequency', 1.0))
             self.waveform_combo.setCurrentText(lfo.get('waveform', 'sine'))
+            is_synced = lfo.get('sync_to_motion', False)
+            self.sync_checkbox.setChecked(is_synced)
+            self.sync_mult_spinbox.setValue(lfo.get('sync_multiplier', 1.0))
+            self.sync_inertia_spinbox.setValue(lfo.get('sync_inertia', 2.0))
+            self.freq_spinbox.setValue(lfo.get('frequency', 1.0))
             self.phase_offset_spinbox.setValue(lfo.get('phase_offset', 0.0))
             self.randomness_spinbox.setValue(lfo.get('randomness', 0.0))
 
+            self._update_ui_state(is_synced)
+
         self.inspector_panel.setEnabled(True)
+
+    @Slot(bool)
+    def _update_ui_state(self, is_synced: bool):
+        """Toggles parameter visibility and modifies labels dynamically."""
+        self.sync_mult_spinbox.setVisible(is_synced)
+        self.sync_mult_label.setVisible(is_synced)
+        self.sync_inertia_spinbox.setVisible(is_synced)
+        self.sync_inertia_label.setVisible(is_synced)
+        
+        if is_synced:
+            self.freq_label.setText("Resting Frequency (Hz):")
+            self.freq_spinbox.setToolTip("The frequency the LFO decays toward when motion stops.")
+        else:
+            self.freq_label.setText("Frequency (Hz):")
+            self.freq_spinbox.setToolTip("The speed of the LFO in cycles per second (Hertz).")
 
     def _on_inspector_value_changed(self, key: str, value: Any):
         """

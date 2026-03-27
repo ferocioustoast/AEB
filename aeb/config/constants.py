@@ -338,7 +338,7 @@ DEFAULT_SETTINGS: dict = {
     'impact_zone_size': 0.05,
 
     # Rhythmic Entrainment (Cadence Lock)
-    'trance_memory_strokes': 4,
+    'trance_memory_sweeps': 4,
     'trance_tolerance_pct': 0.15,
     'trance_immersion_rate': 2.0,
     'trance_shatter_rate': 0.5,

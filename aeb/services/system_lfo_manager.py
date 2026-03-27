@@ -47,6 +47,9 @@ class SystemLfoManager(QObject):
             "waveform": "sine",
             "phase_offset": 0.0,
             "randomness": 0.0,
+            "sync_to_motion": False,
+            "sync_multiplier": 1.0,
+            "sync_inertia": 2.0,
         }
         lfos.append(new_lfo)
         self._update_and_notify(lfos)

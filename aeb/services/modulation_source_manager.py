@@ -85,8 +85,15 @@ class ModulationSourceManager:
         self._mcr_trend_is_up: bool = True
         self._mcr_last_extreme: float = 0.0
 
+        # Cadence Tracker State (For PLL Sync)
+        self._cadence_sweep_history = collections.deque(maxlen=3)
+        self._cadence_last_turnaround_time: float = 0.0
+        self._cadence_trend_is_up: bool = True
+        self._cadence_last_extreme: float = 0.0
+        self._current_sweep_hz: float = 0.0
+
         # Rhythmic Trance Engine State
-        self._trance_stroke_history = collections.deque(maxlen=4)
+        self._trance_sweep_history = collections.deque(maxlen=4)
         self._trance_last_turnaround_time: float = 0.0
         self._trance_is_locked: bool = False
         self._trance_output_level: float = 0.0
@@ -225,7 +232,13 @@ class ModulationSourceManager:
         self._mcr_trend_is_up = True
         self._mcr_last_extreme = 0.0
 
-        self._trance_stroke_history.clear()
+        self._cadence_sweep_history.clear()
+        self._cadence_last_turnaround_time = current_time
+        self._cadence_trend_is_up = True
+        self._cadence_last_extreme = self.last_motion_value
+        self._current_sweep_hz = 0.0
+
+        self._trance_sweep_history.clear()
         self._trance_last_turnaround_time = current_time
         self._trance_is_locked = False
         self._trance_output_level = 0.0
@@ -358,8 +371,14 @@ class ModulationSourceManager:
             self._direction_target = 0.5
             self._mcr_last_extreme = 0.0
             
+            self._cadence_sweep_history.clear()
+            self._cadence_last_turnaround_time = current_time
+            self._cadence_trend_is_up = True
+            self._cadence_last_extreme = primary_motion_value
+            self._current_sweep_hz = 0.0
+
             # Reset Trance State
-            self._trance_stroke_history.clear()
+            self._trance_sweep_history.clear()
             self._trance_last_turnaround_time = current_time
             self._trance_is_locked = False
             self._trance_output_level = 0.0
@@ -376,6 +395,7 @@ class ModulationSourceManager:
             self.adhesion_is_stuck = False
             self.adhesion_bond_timer = 0.0
             self.adhesion_level = 0.0
+            self.adhesion_target_level = 0.0
             self.adhesion_stage = 'idle'
             self.impulse_vel = 0.0
             self.impulse_pos = 0.0
@@ -387,8 +407,14 @@ class ModulationSourceManager:
             self._span_current_smoothed = 0.0
             self._mcr_last_extreme = primary_motion_value
             
+            self._cadence_sweep_history.clear()
+            self._cadence_last_turnaround_time = current_time
+            self._cadence_trend_is_up = True
+            self._cadence_last_extreme = primary_motion_value
+            self._current_sweep_hz = 0.0
+
             # Reset Trance
-            self._trance_stroke_history.clear()
+            self._trance_sweep_history.clear()
             self._trance_last_turnaround_time = current_time
             self._trance_is_locked = False
             self._trance_output_level = 0.0
@@ -506,20 +532,59 @@ class ModulationSourceManager:
         self._update_adhesion_physics(safe_dt, normalized_speed, normalized_accel)
         self._update_motion_span(primary_motion_value, current_time)
         self._update_motion_cycle_randomizer(primary_motion_value)
+        self._update_motion_cadence(primary_motion_value, current_time)
         self._update_rhythmic_trance(primary_motion_value, current_time, safe_dt)
 
         self.last_motion_value = primary_motion_value
         self.last_motion_speed = speed
         self.last_motion_accel = acceleration
 
+    def _update_motion_cadence(self, current_pos: float, current_time: float):
+        """Tracks the sweep cadence (turnarounds) for PLL synchronization."""
+        hysteresis = self.config.live_params.get('motion_cycle_hysteresis', 0.02)
+        is_turnaround = False
+        
+        if self._cadence_trend_is_up:
+            if current_pos > self._cadence_last_extreme:
+                self._cadence_last_extreme = current_pos
+            if current_pos < (self._cadence_last_extreme - hysteresis):
+                self._cadence_trend_is_up = False
+                self._cadence_last_extreme = current_pos
+                is_turnaround = True
+        else:
+            if current_pos < self._cadence_last_extreme:
+                self._cadence_last_extreme = current_pos
+            if current_pos > (self._cadence_last_extreme + hysteresis):
+                self._cadence_trend_is_up = True
+                self._cadence_last_extreme = current_pos
+                is_turnaround = True
+
+        if is_turnaround:
+            duration = current_time - self._cadence_last_turnaround_time
+            if duration > 0.001: # Filter out near-instant updates
+                self._cadence_sweep_history.append(duration)
+            self._cadence_last_turnaround_time = current_time
+            
+            
+        if len(self._cadence_sweep_history) > 0:
+            median_duration = float(np.median(self._cadence_sweep_history))
+            if median_duration > 0.05:
+                # 1 turnaround duration = half a cycle. Full cycle duration = median_duration * 2.
+                full_cycle_duration = median_duration * 2.0
+                self._current_sweep_hz = 1.0 / full_cycle_duration
+            else:
+                self._current_sweep_hz = 0.0
+        else:
+            self._current_sweep_hz = 0.0
+
     def _update_rhythmic_trance(self, current_pos: float, current_time: float, delta_time: float):
         """Monitors motion cadence and calculates the Rhythmic Trance level."""
         live = self.config.live_params
-        mem_strokes = int(live.get('trance_memory_strokes', 4))
+        mem_sweeps = int(live.get('trance_memory_sweeps', 4))
         
-        if self._trance_stroke_history.maxlen != mem_strokes:
-            self._trance_stroke_history = collections.deque(
-                list(self._trance_stroke_history), maxlen=max(1, mem_strokes)
+        if self._trance_sweep_history.maxlen != mem_sweeps:
+            self._trance_sweep_history = collections.deque(
+                list(self._trance_sweep_history), maxlen=max(1, mem_sweeps)
             )
 
         hysteresis = live.get('motion_cycle_hysteresis', 0.02)
@@ -542,17 +607,17 @@ class ModulationSourceManager:
 
         if is_turnaround:
             duration = current_time - self._trance_last_turnaround_time
-            self._trance_stroke_history.append(duration)
+            self._trance_sweep_history.append(duration)
             self._trance_last_turnaround_time = current_time
 
         tolerance = live.get('trance_tolerance_pct', 0.15)
         timeout_factor = live.get('trance_timeout_factor', 1.5)
         time_since_turnaround = current_time - self._trance_last_turnaround_time
 
-        if len(self._trance_stroke_history) == mem_strokes and mem_strokes > 0:
-            min_dur = min(self._trance_stroke_history)
-            max_dur = max(self._trance_stroke_history)
-            mean_dur = sum(self._trance_stroke_history) / mem_strokes
+        if len(self._trance_sweep_history) == mem_sweeps and mem_sweeps > 0:
+            min_dur = min(self._trance_sweep_history)
+            max_dur = max(self._trance_sweep_history)
+            mean_dur = sum(self._trance_sweep_history) / mem_sweeps
 
             if mean_dur > 1e-6:
                 variance_ratio = (max_dur - min_dur) / mean_dur
@@ -1138,7 +1203,7 @@ class ModulationSourceManager:
                 self.last_random_update_time = current_time
 
     def _update_system_lfos(self, delta_time: float, lfo_defs: List[dict]):
-        """Calculates System LFO sources."""
+        """Calculates System LFO sources with integrated Phase-Locked Loop logic."""
         store = self.app_context.modulation_source_store
         lfo_names_in_config = {lfo.get('name') for lfo in lfo_defs}
 
@@ -1146,16 +1211,41 @@ class ModulationSourceManager:
             if name not in lfo_names_in_config:
                 del self._system_lfo_states[name]
 
+        current_time = time.perf_counter()
+        time_since_turnaround = current_time - self._cadence_last_turnaround_time
+
         for lfo in lfo_defs:
             name = lfo.get('name')
             if not name:
                 continue
 
             if name not in self._system_lfo_states:
-                self._system_lfo_states[name] = {'phase': 0.0, 'last_random': 0.0}
+                self._system_lfo_states[name] = {
+                    'phase': 0.0, 
+                    'last_random': 0.0, 
+                    'current_freq': lfo.get('frequency', 1.0)
+                }
             state = self._system_lfo_states[name]
 
-            freq = lfo.get('frequency', 1.0)
+            base_freq = lfo.get('frequency', 1.0)
+            sync_to_motion = lfo.get('sync_to_motion', False)
+            sync_mult = lfo.get('sync_multiplier', 1.0)
+            sync_inertia = lfo.get('sync_inertia', 2.0)
+
+            if sync_to_motion:
+                # If motion has stopped for more than 1.5 seconds, drift to resting frequency.
+                if time_since_turnaround > 1.5 or self._current_sweep_hz <= 0.0:
+                    target_freq = base_freq
+                else:
+                    target_freq = self._current_sweep_hz * sync_mult
+                    
+                target_freq = np.clip(target_freq, 0.001, 25.0)
+                rate = 1.0 / max(0.1, sync_inertia)
+                state['current_freq'] += (target_freq - state['current_freq']) * rate * delta_time
+            else:
+                state['current_freq'] = base_freq
+
+            freq = state['current_freq']
             phase_offset = lfo.get('phase_offset', 0.0) * 2 * np.pi
             phase_increment = (2 * np.pi * freq) * delta_time
             state['phase'] = (state['phase'] + phase_increment) % (2 * np.pi)

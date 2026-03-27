@@ -470,7 +470,7 @@ class ConfigurationManager:
         source_migration_map = {"Internal: L0 Speed": "Primary Motion: Speed",
                                 "Internal: L0 Acceleration": "Primary Motion: Acceleration",
                                 "Internal: L0 Direction": "Primary Motion: Direction"}
-        target_migration_map = {"Internal: Master Stroke Driver.value": "Internal: Primary Motion Driver.value"}
+        target_migration_map = {"Internal: Master Sweep Driver.value": "Internal: Primary Motion Driver.value"}
         migration_occurred = False
 
         for rule in matrix:

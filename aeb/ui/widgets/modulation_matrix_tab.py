@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 META_TARGET_PATTERN = re.compile(r"modulation_matrix\.(\d+)\.(amount|enabled)")
 STATE_TARGET_PATTERN = re.compile(r"State\.([a-zA-Z0-9_]+)\.(set|add|subtract|toggle)")
 SCENE_TARGET_PATTERN = re.compile(r"Scene\.TransitionTo\.(\d+)")
-LFO_TARGET_PATTERN = re.compile(r"System LFO\.([^.]+)\.(frequency|phase_offset|randomness)")
+LFO_TARGET_PATTERN = re.compile(r"System LFO\.([^.]+)\.(frequency|phase_offset|randomness|sync_to_motion|sync_multiplier|sync_inertia)")
 MOTION_FEEL_TARGET_PATTERN = re.compile(r"MotionFeel\.([A-Z0-9V]+)\.(.+)")
 
 
@@ -280,7 +280,7 @@ class ModulationMatrixTab(QWidget):
         elif category_name == 'Zonal':
             new_items = ['pressure']
         elif category_name == 'System LFO':
-            new_items = ['frequency', 'phase_offset', 'randomness']
+            new_items = ['frequency', 'phase_offset', 'randomness', 'sync_to_motion', 'sync_multiplier', 'sync_inertia']
         elif category_name == 'Modulation Matrix':
             new_items = ['amount', 'enabled']
         elif category_name == 'State':
@@ -311,7 +311,7 @@ class ModulationMatrixTab(QWidget):
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
                 'impulse_gain_spinbox', 'input_inertia',
                 'impact_threshold', 'impact_decay_s', 'impact_zone_size',
-                'trance_memory_strokes', 'trance_tolerance_pct',
+                'trance_memory_sweeps', 'trance_tolerance_pct',
                 'trance_immersion_rate', 'trance_shatter_rate', 'trance_timeout_factor'
             ]
         
@@ -596,7 +596,7 @@ class ModulationMatrixTab(QWidget):
             'Ramping.ramp_down_enabled', 'Ramping.long_idle_enabled',
             'Loop.randomize_loop_speed', 'Loop.randomize_loop_range'
         ]
-        is_bool_target = any(target.endswith(p) for p in ['_enabled', '.enabled']) or target in bool_targets
+        is_bool_target = any(target.endswith(p) for p in ['_enabled', '.enabled', '.sync_to_motion']) or target in bool_targets
 
         if is_bool_target:
             with self.main_window._block_signals(combo):
@@ -641,8 +641,8 @@ class ModulationMatrixTab(QWidget):
             'Ramping.ramp_down_enabled', 'Ramping.long_idle_enabled',
             'Loop.randomize_loop_speed', 'Loop.randomize_loop_range'
         ]
-        is_bool_target = any(target.endswith(p) for p in ['_enabled', '.enabled']) or target in bool_targets
-        is_string_target = target in ['Master.panning_law', 'Loop.motion_type', 'Source Tuning.spatial_texture_waveform']
+        is_bool_target = any(target.endswith(p) for p in['_enabled', '.enabled', '.sync_to_motion']) or target in bool_targets
+        is_string_target = target in['Master.panning_law', 'Loop.motion_type', 'Source Tuning.spatial_texture_waveform']
 
         if is_bool_target or is_string_target:
             with self.main_window._block_signals(mode_widget):
@@ -779,7 +779,7 @@ class ModulationMatrixTab(QWidget):
                     'Ramping.ramp_down_enabled', 'Ramping.long_idle_enabled',
                     'Loop.randomize_loop_speed', 'Loop.randomize_loop_range'
                 ]
-                if any(target_str.endswith(p) for p in ['_enabled', '.enabled']) or target_str in bool_targets:
+                if any(target_str.endswith(p) for p in ['_enabled', '.enabled', '.sync_to_motion']) or target_str in bool_targets:
                     value = 1.0 if value == 'On' else 0.0
 
             mod_matrix[row_index][key] = value

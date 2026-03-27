@@ -125,7 +125,7 @@ class SourceTuningTab(QWidget):
         self.drift_speed_spinbox.setValue(cfg.get('internal_drift_speed'))
         self.drift_octaves_spinbox.setValue(cfg.get('internal_drift_octaves'))
         
-        self.trance_memory_strokes_spinbox.setValue(cfg.get('trance_memory_strokes'))
+        self.trance_memory_sweeps_spinbox.setValue(cfg.get('trance_memory_sweeps'))
         self.trance_tolerance_pct_spinbox.setValue(cfg.get('trance_tolerance_pct'))
         self.trance_immersion_rate_spinbox.setValue(cfg.get('trance_immersion_rate'))
         self.trance_shatter_rate_spinbox.setValue(cfg.get('trance_shatter_rate'))
@@ -209,7 +209,7 @@ class SourceTuningTab(QWidget):
         self.drift_speed_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_speed', v))
         self.drift_octaves_spinbox.valueChanged.connect(lambda v: mwu('internal_drift_octaves', v))
         
-        self.trance_memory_strokes_spinbox.valueChanged.connect(lambda v: mwu('trance_memory_strokes', v))
+        self.trance_memory_sweeps_spinbox.valueChanged.connect(lambda v: mwu('trance_memory_sweeps', v))
         self.trance_tolerance_pct_spinbox.valueChanged.connect(lambda v: mwu('trance_tolerance_pct', v))
         self.trance_immersion_rate_spinbox.valueChanged.connect(lambda v: mwu('trance_immersion_rate', v))
         self.trance_shatter_rate_spinbox.valueChanged.connect(lambda v: mwu('trance_shatter_rate', v))
@@ -314,9 +314,9 @@ class SourceTuningTab(QWidget):
         )
         layout = QFormLayout(group)
 
-        self.trance_memory_strokes_spinbox = QSpinBox(minimum=2, maximum=10)
-        self.trance_memory_strokes_spinbox.setToolTip("Number of half-strokes used to calculate variance.")
-        layout.addRow("Memory Strokes:", self.trance_memory_strokes_spinbox)
+        self.trance_memory_sweeps_spinbox = QSpinBox(minimum=2, maximum=10)
+        self.trance_memory_sweeps_spinbox.setToolTip("Number of half-sweeps used to calculate variance.")
+        layout.addRow("Memory Sweeps:", self.trance_memory_sweeps_spinbox)
 
         self.trance_tolerance_pct_spinbox = QDoubleSpinBox(decimals=2, minimum=0.0, maximum=0.5, singleStep=0.05)
         self.trance_tolerance_pct_spinbox.setToolTip("Allowed % deviation from mean duration to maintain Lock.")
