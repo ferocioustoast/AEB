@@ -192,8 +192,12 @@ class ConfigurationManager:
             return False
 
         if "scene_playlist" in loaded_data and isinstance(loaded_data["scene_playlist"], dict):
+            for k, v in loaded_data["scene_playlist"].items():
+                if isinstance(v, dict):
+                    v['__filepath__'] = filepath
             self._process_scene_pack(loaded_data)
         else:
+            loaded_data['__filepath__'] = filepath
             self._process_single_scene(loaded_data)
 
         self.app_context.reset_scene_related_state()
@@ -267,6 +271,54 @@ class ConfigurationManager:
                     val = DEFAULT_SETTINGS.get(key)
                 self.app_context.live_params[key] = val
 
+    def smart_reload_playlist_scene(self, index_str: str) -> bool:
+        """
+        Unconditionally reloads the scene from disk if a linked filepath exists.
+        Logs explicit warnings if the reload cannot be performed.
+        """
+        cached_scene = self.app_context.scene_playlist.get(index_str)
+        if not cached_scene:
+            return False
+
+        filepath = cached_scene.get('__filepath__')
+        if not filepath:
+            self.app_context.signals.log_message.emit(
+                f"Warning: Scene {index_str} has no linked file path. Cannot auto-reload from disk. "
+                "Please remove and re-add it to the playlist."
+            )
+            return False
+
+        if not os.path.exists(filepath):
+            self.app_context.signals.log_message.emit(
+                f"Warning: File not found at '{filepath}'. Cannot auto-reload."
+            )
+            return False
+
+        fresh_data = self._read_scene_file(filepath)
+        if not fresh_data:
+            self.app_context.signals.log_message.emit(
+                f"Warning: Could not read or parse '{filepath}'."
+            )
+            return False
+
+        if "scene_playlist" in fresh_data and isinstance(fresh_data["scene_playlist"], dict):
+            fresh_scene = fresh_data["scene_playlist"].get(index_str)
+            if not fresh_scene:
+                self.app_context.signals.log_message.emit(
+                    f"Warning: Scene index {index_str} no longer exists in the reloaded Scene Pack."
+                )
+                return False
+        else:
+            fresh_scene = fresh_data
+
+        # Re-inject the filepath so future reloads keep working
+        fresh_scene['__filepath__'] = filepath
+
+        # Forcefully overwrite the cache with the new disk data
+        self.app_context.scene_playlist[index_str] = fresh_scene
+        self.app_context.signals.log_message.emit(f"Scene {index_str} forcefully reloaded from disk.")
+        return True
+
     def _read_yaml_file(self, filepath: str) -> Optional[Any]:
         """Reads and parses a YAML file, handling errors."""
         try:
@@ -300,7 +352,10 @@ class ConfigurationManager:
         )
         if not filepath:
             return None
-        return self._read_scene_file(filepath)
+        data = self._read_scene_file(filepath)
+        if data:
+            data['__filepath__'] = filepath
+        return data
 
     def _process_scene_pack(self, pack_data: dict):
         """Processes a loaded Scene Pack file."""
@@ -491,7 +546,6 @@ class ConfigurationManager:
         
         if migration_occurred:
             self.app_context.signals.log_message.emit("Modulation matrix migration complete for loaded scene.")
-
 
     def _relativize_sampler_paths(self, sound_waves: dict) -> dict:
         """Converts absolute sampler paths to relative for saving."""

@@ -333,10 +333,12 @@ class SceneManagementTab(QWidget):
         selected_items = self.playlist_widget.selectedItems()
         if not selected_items: return
 
-        scene_index_str = selected_items[0].data(Qt.UserRole)
-        if scene_index_str is None: return
+        scene_index_str = str(selected_items[0].data(Qt.UserRole))
+        if not scene_index_str: return
 
-        scene_data = self.app_context.scene_playlist.get(str(scene_index_str))
+        self.main_window.controller.config_manager.smart_reload_playlist_scene(scene_index_str)
+
+        scene_data = self.app_context.scene_playlist.get(scene_index_str)
         if scene_data:
             self.main_window.controller.config_manager.apply_scene_to_active_slot(scene_data)
             self.app_context.active_transition_state['active_scene_index'] = int(scene_index_str)

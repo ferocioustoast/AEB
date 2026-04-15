@@ -27,7 +27,7 @@ class SceneTransitionManager:
         self.app_context = app_context
         self.controller = controller
 
-    def start_transition(self, target_index_str: str, duration_s: float):
+    def start_transition(self, target_index_str: str, duration_s: float, force: bool = False):
         """
         Initiates a new scene transition.
 
@@ -35,6 +35,7 @@ class SceneTransitionManager:
             target_index_str: The string key of the target scene in the playlist.
             duration_s: The total duration for the transition. This value will be
                 split between the ramp-down and ramp-up phases.
+            force: If True, bypasses the active scene check to allow reloading.
         """
         state = self.app_context.active_transition_state
         if state.get('stage') != 'idle':
@@ -42,7 +43,7 @@ class SceneTransitionManager:
                 "Cannot start new transition; one is already in progress.")
             return
 
-        if str(state.get('active_scene_index')) == target_index_str:
+        if str(state.get('active_scene_index')) == target_index_str and not force:
             self.app_context.signals.log_message.emit(
                 f"Transition request ignored: already on scene {target_index_str}.")
             return

@@ -437,10 +437,13 @@ class MainController(QObject):
             action: The action dictionary.
         """
         if self.app_context.modulation_engine:
-            target_index = action.get('target_index', "0")
+            target_index = str(action.get('target_index', "0"))
             duration = action.get('duration_s', 0.0)
+            
+            did_reload = self.config_manager.smart_reload_playlist_scene(target_index)
+            
             self.app_context.modulation_engine.transition_manager.start_transition(
-                str(target_index), duration)
+                target_index, duration, force=did_reload)
 
     def _handle_action_toggle_loop(self, action: Dict):
         """
