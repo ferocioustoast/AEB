@@ -69,6 +69,12 @@ class StandardInspector(InspectorPanelBase):
             self.amp_spinbox.setValue(conf.get('amplitude', 1.0))
             self.duty_spinbox.setValue(conf.get('duty_cycle', 1.0))
             
+            morph_val = conf.get('shape_morph', 0.0)
+            self.morph_slider.setValue(int(morph_val * 100))
+            self.morph_spinbox.setValue(morph_val)
+            self.morph_slider.setEnabled(not is_noise and wave_type != 'sampler')
+            self.morph_spinbox.setEnabled(not is_noise and wave_type != 'sampler')
+            
             jitter_val = conf.get('phase_jitter_amount', 0.0)
             self.jitter_slider.setValue(int(jitter_val * 100))
             self.jitter_spinbox.setValue(jitter_val)
@@ -133,7 +139,35 @@ class StandardInspector(InspectorPanelBase):
             decimals=2, minimum=0.01, maximum=1.0, singleStep=0.05)
         self.duty_spinbox.setToolTip("Pulse width for Square waves (0.5 = Square).")
         layout.addRow("Duty Cycle:", self.duty_spinbox)
+
+        # --- Shape Morph Controls ---
+        morph_layout_widget = QWidget()
+        morph_layout = QHBoxLayout(morph_layout_widget)
+        morph_layout.setContentsMargins(0, 0, 0, 0)
+        morph_layout.setSpacing(5)
         
+        self.morph_slider = QSlider(Qt.Horizontal, minimum=-100, maximum=100)
+        self.morph_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        self.morph_spinbox = QDoubleSpinBox(
+            minimum=-1.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.morph_spinbox.setMinimumWidth(70)
+        self.morph_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        morph_tip = (
+            "<b>Shape Morph:</b> Relative timbral shift.<br>"
+            "-1.0 morphs to Sine (Smooth).<br>"
+            "+1.0 morphs to Square (Buzzy).<br>"
+            "0.0 is the base waveform."
+        )
+        self.morph_slider.setToolTip(morph_tip)
+        self.morph_spinbox.setToolTip(morph_tip)
+        
+        morph_layout.addWidget(self.morph_slider)
+        morph_layout.addWidget(self.morph_spinbox)
+        layout.addRow("Shape Morph:", morph_layout_widget)
+        # -----------------------------------
+
         # --- Jitter / Friction Controls ---
         jitter_layout_widget = QWidget()
         jitter_layout = QHBoxLayout(jitter_layout_widget)
@@ -316,6 +350,7 @@ class StandardInspector(InspectorPanelBase):
             self.freq_spinbox: ('frequency', 'valueChanged'),
             self.amp_spinbox: ('amplitude', 'valueChanged'),
             self.duty_spinbox: ('duty_cycle', 'valueChanged'),
+            self.morph_spinbox: ('shape_morph', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
             self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
@@ -337,6 +372,11 @@ class StandardInspector(InspectorPanelBase):
         for widget, (key, signal_name) in connections.items():
             signal = widget.__getattribute__(signal_name)
             signal.connect(lambda val, k=key: self.setting_changed.emit(k, val))
+
+        self.morph_slider.valueChanged.connect(
+            lambda val: self.morph_spinbox.setValue(val / 100.0))
+        self.morph_spinbox.valueChanged.connect(
+            lambda val: self.morph_slider.setValue(int(val * 100)))
 
         self.pan_slider.valueChanged.connect(
             lambda val: self.pan_spinbox.setValue(val / 100.0))

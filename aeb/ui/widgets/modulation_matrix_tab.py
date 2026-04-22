@@ -216,6 +216,9 @@ class ModulationMatrixTab(QWidget):
             'filter_formant_vowel',
             'ads_attack_time', 'ads_decay_time', 'ads_sustain_level', 'adsr_release_time'
         ]
+        
+        if wave_type in['sine', 'square', 'sawtooth', 'triangle', 'additive']:
+            params.append('shape_morph')
 
         if wave_type == 'additive':
             params.extend(['spectral_tilt', 'odd_even_bias'])

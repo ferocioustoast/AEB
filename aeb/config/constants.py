@@ -77,6 +77,7 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'frequency': 987.0,
     'amplitude': 1.0,
     'duty_cycle': 1.0,
+    'shape_morph': 0.0,
     'phase_jitter_amount': 0.0,
     'ads_attack_time': 0.0,
     'ads_decay_time': 0.0,

@@ -71,6 +71,10 @@ class AdditiveInspector(InspectorPanelBase):
             self.jitter_spinbox.setValue(jitter_val)
 
             # Macro Parameters
+            morph_val = conf.get('shape_morph', 0.0)
+            self.morph_slider.setValue(int(morph_val * 100))
+            self.morph_spinbox.setValue(morph_val)
+
             tilt_val = conf.get('spectral_tilt', 0.0)
             self.tilt_slider.setValue(int(tilt_val * 100))
             self.tilt_spinbox.setValue(tilt_val)
@@ -92,6 +96,9 @@ class AdditiveInspector(InspectorPanelBase):
                 self.harmonic_labels[i].setText(f"H{i+1} ({h_freq:.0f} Hz):")
                 self.harmonic_spinboxes[i].setValue(h_val)
                 self.harmonic_sliders[i].setValue(int(h_val * 1000))
+                self.harmonic_sliders[i].setEnabled(True)
+                self.harmonic_spinboxes[i].setEnabled(True)
+
             self.atk_spinbox.setValue(conf.get('ads_attack_time', 0.0))
             self.dec_spinbox.setValue(conf.get('ads_decay_time', 0.0))
             self.sus_spinbox.setValue(conf.get('ads_sustain_level', 1.0))
@@ -192,6 +199,29 @@ class AdditiveInspector(InspectorPanelBase):
         """Creates the Timbre Macro controls."""
         group = QGroupBox("Timbre Macros")
         layout = QFormLayout(group)
+
+        # Shape Morph
+        morph_widget = QWidget()
+        morph_layout = QHBoxLayout(morph_widget)
+        morph_layout.setContentsMargins(0, 0, 0, 0)
+        self.morph_slider = QSlider(Qt.Horizontal, minimum=-100, maximum=100)
+        self.morph_spinbox = QDoubleSpinBox(minimum=-1.0, maximum=1.0, singleStep=0.01, decimals=2)
+        self.morph_spinbox.setMinimumWidth(70)
+
+        morph_tip = (
+            "<b>Shape Morph:</b> Relative timbral shift.<br>"
+            "-1.0 morphs to Sine (Smooth).<br>"
+            "+1.0 morphs to Square (Buzzy).<br>"
+            "0.0 is the base harmonic recipe."
+        )
+        self.morph_slider.setToolTip(morph_tip)
+        self.morph_spinbox.setToolTip(morph_tip)
+
+        morph_layout.addWidget(self.morph_slider)
+        morph_layout.addWidget(self.morph_spinbox)
+        label_morph = QLabel("Shape Morph:")
+        label_morph.setToolTip(morph_tip)
+        layout.addRow(label_morph, morph_widget)
 
         # Spectral Tilt
         tilt_widget = QWidget()
@@ -392,6 +422,7 @@ class AdditiveInspector(InspectorPanelBase):
             self.filter_type_combo: ('filter_type', 'currentTextChanged'),
             self.filter_freq_spinbox: ('filter_cutoff_frequency', 'valueChanged'),
             self.filter_q_spinbox: ('filter_resonance_q', 'valueChanged'),
+            self.morph_spinbox: ('shape_morph', 'valueChanged'),
             self.tilt_spinbox: ('spectral_tilt', 'valueChanged'),
             self.bias_spinbox: ('odd_even_bias', 'valueChanged'),
             self.formant_spinbox: ('filter_formant_vowel', 'valueChanged'),
@@ -399,6 +430,11 @@ class AdditiveInspector(InspectorPanelBase):
         for widget, (key, signal_name) in connections.items():
             signal = widget.__getattribute__(signal_name)
             signal.connect(lambda val, k=key: self.setting_changed.emit(k, val))
+
+        self.morph_slider.valueChanged.connect(
+            lambda val: self.morph_spinbox.setValue(val / 100.0))
+        self.morph_spinbox.valueChanged.connect(
+            lambda val: self.morph_slider.setValue(int(val * 100)))
 
         self.pan_slider.valueChanged.connect(
             lambda val: self.pan_spinbox.setValue(val / 100.0))
@@ -436,6 +472,7 @@ class AdditiveInspector(InspectorPanelBase):
         self.filter_type_combo.currentTextChanged.connect(self._update_filter_ui_state)
         self.spatial_mapping_checkbox.toggled.connect(self._on_spatial_mapping_toggled)
         self.edit_spatial_map_btn.clicked.connect(self._launch_spatial_mapper_dialog)
+
 
     def _emit_harmonics_change(self):
         """Gathers all harmonic values and emits them as a single list update."""

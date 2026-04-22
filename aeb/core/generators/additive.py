@@ -37,8 +37,8 @@ class AdditiveGenerator(AudioGeneratorBase):
     def _synthesize_block(self, params: dict, num_samples: int):
         """
         Vectorized synthesis of an additive waveform from harmonic amplitudes.
-        Applies macro parameters (Tilt, Bias) to the harmonic structure before
-        generating audio. Writes result into self.output_buffer.
+        Applies macro parameters (Morph, Tilt, Bias) to the harmonic structure 
+        before generating audio. Writes result into self.output_buffer.
         """
         envelope = self._process_and_get_adsr_envelope(num_samples)
 
@@ -48,14 +48,31 @@ class AdditiveGenerator(AudioGeneratorBase):
         harmonic_amplitudes = np.array(params['harmonics'], dtype=np.float32)
         num_harmonics = len(harmonic_amplitudes)
         
-        # 2. Spectral Tilt (Inject 1/n Sawtooth Series)
+        # 2. Shape Morph (Pre-synthesis array interpolation)
+        morph = params.get('shape_morph', 0.0)
+        if abs(morph) > 0.001:
+            if morph < 0:
+                # Morph towards Sine:[1.0, 0.0, 0.0...]
+                sine_recipe = np.zeros(num_harmonics, dtype=np.float32)
+                sine_recipe[0] = 1.0
+                harmonic_amplitudes = (harmonic_amplitudes * (1.0 - abs(morph))) + (sine_recipe * abs(morph))
+            else:
+                # Morph towards Square: [1/n for odd, 0 for even]
+                square_recipe = np.zeros(num_harmonics, dtype=np.float32)
+                for i in range(num_harmonics):
+                    n = i + 1
+                    if n % 2 != 0:
+                        square_recipe[i] = 1.0 / n
+                harmonic_amplitudes = (harmonic_amplitudes * (1.0 - morph)) + (square_recipe * morph)
+
+        # 3. Spectral Tilt (Inject 1/n Sawtooth Series)
         tilt = params.get('spectral_tilt', 0.0)
         if tilt > 0.001:
             indices = np.arange(1, num_harmonics + 1)
             # Add ideal sawtooth series scaled by tilt amount
             harmonic_amplitudes += (1.0 / indices) * tilt
 
-        # 3. Odd/Even Bias (Harmonic Masking)
+        # 4. Odd/Even Bias (Harmonic Masking)
         bias = params.get('odd_even_bias', 0.0)
         if abs(bias) > 0.001:
             # Array index 0 is Harmonic #1 (Odd)
@@ -71,7 +88,7 @@ class AdditiveGenerator(AudioGeneratorBase):
                 mask_val = 1.0 - bias
                 harmonic_amplitudes[0::2] *= mask_val
 
-        # 4. Filter and Normalize
+        # 5. Filter
         active_h_mask = harmonic_amplitudes > 1e-5
         
         if not np.any(active_h_mask):
@@ -79,13 +96,6 @@ class AdditiveGenerator(AudioGeneratorBase):
             return
 
         active_h_amps = harmonic_amplitudes[active_h_mask]
-        
-        # --- FIXED NORMALIZATION LOGIC ---
-        # Only scale down if the sum > 1.0 to prevent clipping.
-        # Do NOT scale up if sum < 1.0, otherwise we undo the user's bias/attenuation.
-        sum_amps = np.sum(active_h_amps)
-        if sum_amps > 1.0:
-            active_h_amps /= sum_amps
 
         # --- Synthesis ---
         phase_inc = 2 * np.pi * params['frequency'] / self.sample_rate
