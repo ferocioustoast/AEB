@@ -1018,7 +1018,7 @@ class ModulationSourceManager:
 
         store.set_source("Internal: Loop", final_value)
 
-        if self.app_context.panning_manager._highest_priority_active_source == 'internal_loop':
+        if self.app_context.panning_manager.get_highest_priority_source() == 'internal_loop':
             self.app_context.panning_manager.update_value(
                 'internal_loop', final_value)
 

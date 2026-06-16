@@ -198,54 +198,52 @@ class ModulationEngine:
             long_idle_time = live.get('long_idle_trigger_time', 5.0)
             long_idle_enabled = live.get('long_idle_enabled', True)
 
-        time_since_activity = time.perf_counter() - ctx.last_activity_time
-        state = ctx.ramping_state
+            time_since_activity = time.perf_counter() - ctx.last_activity_time
+            state = ctx.ramping_state
 
-        if time_since_activity < idle_time:
-            if state in ['down', 'idle']:
-                state = 'up'
-                if ctx.long_idle_armed:
-                    ctx.is_sensitivity_ramping = True
-                    ctx.sensitivity_ramp_start_time = time.perf_counter()
-                    ctx.long_idle_armed = False
-        elif state == 'sustain' and time_since_activity >= idle_time:
-            state = 'down'
+            if time_since_activity < idle_time:
+                if state in ['down', 'idle']:
+                    state = 'up'
+                    if ctx.long_idle_armed:
+                        ctx.is_sensitivity_ramping = True
+                        ctx.sensitivity_ramp_start_time = time.perf_counter()
+                        ctx.long_idle_armed = False
+            elif state == 'sustain' and time_since_activity >= idle_time:
+                state = 'down'
 
-        if state == 'up':
-            with ctx.live_params_lock:
-                ramp_up_is_enabled = ctx.live_params.get('ramp_up_enabled', True)
-                ramp_time = ctx.live_params.get('ramp_up_time', 0.3)
-            if ramp_up_is_enabled:
-                increment = (1.0 / ramp_time) * delta_time if ramp_time > 0 else 1.0
-                ctx.live_master_ramp_multiplier += increment
-                if ctx.live_master_ramp_multiplier >= 1.0:
+            if state == 'up':
+                ramp_up_is_enabled = live.get('ramp_up_enabled', True)
+                ramp_time = live.get('ramp_up_time', 0.3)
+                if ramp_up_is_enabled:
+                    increment = (1.0 / ramp_time) * delta_time if ramp_time > 0 else 1.0
+                    ctx.live_master_ramp_multiplier += increment
+                    if ctx.live_master_ramp_multiplier >= 1.0:
+                        state = 'sustain'
+                else:
+                    ctx.live_master_ramp_multiplier = 1.0
                     state = 'sustain'
-            else:
-                ctx.live_master_ramp_multiplier = 1.0
-                state = 'sustain'
-        elif state == 'down':
-            with ctx.live_params_lock:
-                ramp_down_is_enabled = ctx.live_params.get('ramp_down_enabled', True)
-                ramp_time = ctx.live_params.get('ramp_down_time', 0.3)
-            if ramp_down_is_enabled:
-                decrement = (1.0 / ramp_time) * delta_time if ramp_time > 0 else 1.0
-                ctx.live_master_ramp_multiplier -= decrement
-                if ctx.live_master_ramp_multiplier <= 0.0:
+            elif state == 'down':
+                ramp_down_is_enabled = live.get('ramp_down_enabled', True)
+                ramp_time = live.get('ramp_down_time', 0.3)
+                if ramp_down_is_enabled:
+                    decrement = (1.0 / ramp_time) * delta_time if ramp_time > 0 else 1.0
+                    ctx.live_master_ramp_multiplier -= decrement
+                    if ctx.live_master_ramp_multiplier <= 0.0:
+                        state = 'idle'
+                else:
+                    ctx.live_master_ramp_multiplier = 0.0
                     state = 'idle'
-            else:
-                ctx.live_master_ramp_multiplier = 0.0
-                state = 'idle'
 
-        ctx.live_master_ramp_multiplier = np.clip(
-            ctx.live_master_ramp_multiplier, 0.0, 1.0)
-        ctx.ramping_state = state
+            ctx.live_master_ramp_multiplier = np.clip(
+                ctx.live_master_ramp_multiplier, 0.0, 1.0)
+            ctx.ramping_state = state
 
-        if long_idle_enabled and state in ['down', 'idle']:
-            if not ctx.long_idle_armed:
-                if time_since_activity >= (idle_time + long_idle_time):
-                    ctx.long_idle_armed = True
-                    ctx.signals.log_message.emit(
-                        "Long idle period detected. Sensitivity reset is now armed.")
+            if long_idle_enabled and state in ['down', 'idle']:
+                if not ctx.long_idle_armed:
+                    if time_since_activity >= (idle_time + long_idle_time):
+                        ctx.long_idle_armed = True
+                        ctx.signals.log_message.emit(
+                            "Long idle period detected. Sensitivity reset is now armed.")
 
     def _update(self):
         """The main high-frequency cycle that orchestrates all modulation logic."""

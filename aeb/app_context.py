@@ -299,8 +299,6 @@ class AppContext:
         self.sensitivity_ramp_start_time: float = 0.0
         self.long_idle_armed: bool = False
         self.looping_active: bool = False
-        self.delay_speed_timer: Optional[threading.Timer] = None
-        self.delay_range_timer: Optional[threading.Timer] = None
         self.loop_base_time_s: float = 1.0
         self.loop_base_min_range: float = 0.0
         self.loop_base_max_range: float = 1.0
@@ -335,10 +333,11 @@ class AppContext:
         with self.state_variables_lock:
             self.state_variables.clear()
         self.warned_mod_rule_indices.clear()
-        self.ramping_state = 'idle'
-        self.live_master_ramp_multiplier = 0.0
-        self.is_sensitivity_ramping = False
-        self.long_idle_armed = False
+        with self.live_params_lock:
+            self.ramping_state = 'idle'
+            self.live_master_ramp_multiplier = 0.0
+            self.is_sensitivity_ramping = False
+            self.long_idle_armed = False
 
         mod_sources_to_reset = [
             k for k in self.modulation_source_store.get_all_source_names()
@@ -347,7 +346,7 @@ class AppContext:
         for key in mod_sources_to_reset:
             self.modulation_source_store.set_source(key, 0.0)
 
-        self.active_transition_state = {'stage': 'idle', 'active_scene_index': 0, 'target_scene_index': 0,
-                                        'start_time': 0.0, 'ramp_down_duration_s': 0.0, 'ramp_up_duration_s': 0.0, 'volume_multiplier': 1.0}
+        self.active_transition_state.update({'stage': 'idle', 'active_scene_index': 0, 'target_scene_index': 0,
+                                             'start_time': 0.0, 'ramp_down_duration_s': 0.0, 'ramp_up_duration_s': 0.0, 'volume_multiplier': 1.0})
         self.signals.log_message.emit(
             "All scene-related state has been reset.")

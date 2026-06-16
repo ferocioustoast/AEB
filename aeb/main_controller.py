@@ -22,8 +22,10 @@ from aeb.services.configuration_manager import ConfigurationManager
 from aeb.services.controller import g_controller_available
 from aeb.services.hotkey_manager import HotkeyManager
 from aeb.services.internal_loop import (
+    cancel_delayed_random_loop_range,
+    cancel_delayed_random_loop_speed,
     schedule_delayed_random_loop_range_enable,
-    schedule_delayed_random_loop_speed_enable
+    schedule_delayed_random_loop_speed_enable,
 )
 from aeb.services.modulation_engine import ModulationEngine
 from aeb.services.screen_flow import ScreenFlowService
@@ -378,6 +380,9 @@ class MainController(QObject):
 
     def shutdown(self):
         """Gracefully shuts down all services and threads."""
+        cancel_delayed_random_loop_speed()
+        cancel_delayed_random_loop_range()
+
         if self.app_context.modulation_engine:
             self.app_context.modulation_engine.stop()
         if self.mod_engine_thread and self.mod_engine_thread.is_alive():
@@ -501,10 +506,8 @@ class MainController(QObject):
             return
 
         self.app_context.looping_active = False
-        if self.app_context.delay_speed_timer and self.app_context.delay_speed_timer.is_alive():
-            self.app_context.delay_speed_timer.cancel()
-        if self.app_context.delay_range_timer and self.app_context.delay_range_timer.is_alive():
-            self.app_context.delay_range_timer.cancel()
+        cancel_delayed_random_loop_speed()
+        cancel_delayed_random_loop_range()
 
         self.app_context.panning_manager.unregister_source('internal_loop')
         self.app_context.signals.looping_status_changed.emit(False)

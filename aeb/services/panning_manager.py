@@ -47,6 +47,11 @@ class PanningManager:
         self._smoothed_position: float = 0.0
         self._inertia_initialized: bool = False
 
+    def get_highest_priority_source(self) -> Optional[str]:
+        """Returns the current highest-priority source name, thread-safe."""
+        with self._lock:
+            return self._highest_priority_active_source
+
     def register_source(self, name: str, source_type: str = 'discrete'):
         """
         Registers a source and re-evaluates which source should have control.
@@ -111,13 +116,15 @@ class PanningManager:
 
         if new_highest != previous_highest:
             if previous_highest is not None:
-                self.app_context.ramping_state = 'down'
+                with self.app_context.live_params_lock:
+                    self.app_context.ramping_state = 'down'
 
             self._highest_priority_active_source = new_highest
 
             if new_highest is not None:
                 # Set initial activity timestamp to prevent instant ramp down
-                self.app_context.last_activity_time = time.perf_counter()
+                with self.app_context.live_params_lock:
+                    self.app_context.last_activity_time = time.perf_counter()
 
     def _update_modulation_source(self, source_key: str, value: float):
         """
@@ -140,15 +147,15 @@ class PanningManager:
             right_min, right_max = live.get('right_min_vol', 0.0), live.get('right_max_vol', 1.0)
             threshold = live.get('ramp_down_activity_threshold', 0.01)
 
-        # --- 1. RAW ACTIVITY DETECTION ---
-        # We detect movement based on the incoming signal BEFORE smoothing.
-        # This prevents inertia from making the system "fall asleep" on micro-movements.
-        delta = abs(raw_val - self.previous_raw_input)
-        source_type = self._source_types.get(
-            self._highest_priority_active_source, 'discrete')
+            # --- 1. RAW ACTIVITY DETECTION ---
+            # We detect movement based on the incoming signal BEFORE smoothing.
+            # This prevents inertia from making the system "fall asleep" on micro-movements.
+            delta = abs(raw_val - self.previous_raw_input)
+            source_type = self._source_types.get(
+                self._highest_priority_active_source, 'discrete')
 
-        if source_type == 'continuous' or delta > threshold:
-            self.app_context.last_activity_time = time.perf_counter()
+            if source_type == 'continuous' or delta > threshold:
+                self.app_context.last_activity_time = time.perf_counter()
         
         self.previous_raw_input = raw_val
 
