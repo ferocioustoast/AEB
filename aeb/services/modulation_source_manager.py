@@ -463,6 +463,8 @@ class ModulationSourceManager:
         normalized_speed = np.clip(speed / self.smoothed_speed_ceiling, 0.0, 1.0)
         normalized_accel = np.clip(
             abs(acceleration) / effective_accel_ceiling, 0.0, 1.0)
+        signed_norm_accel = np.clip(acceleration / effective_accel_ceiling, -1.0, 1.0)
+        normalized_jolt = np.clip(jolt / effective_jolt_ceiling, -1.0, 1.0)
         
         norm_raw_velocity = np.clip(raw_velocity / self.smoothed_speed_ceiling, -1.0, 1.0)
         vel_smooth_factor = live.get('velocity_smoothing', 0.1)
@@ -522,7 +524,7 @@ class ModulationSourceManager:
         store.set_source("Internal: Kinetic Impact", self.kinetic_impact_level)
 
         self._synthesize_virtual_axes(
-            primary_motion_value, normalized_speed, acceleration, jolt, 
+            primary_motion_value, normalized_speed, signed_norm_accel, normalized_jolt,
             raw_velocity, safe_dt
         )
         self._update_spatial_texture(primary_motion_value, raw_velocity)
@@ -1111,20 +1113,17 @@ class ModulationSourceManager:
 
         return final_time
 
-    def _synthesize_virtual_axes(self, position, norm_speed, raw_accel, norm_jolt, raw_velocity, delta_time):
+    def _synthesize_virtual_axes(self, position, norm_speed, signed_norm_accel, normalized_jolt, raw_velocity, delta_time):
         """Calculates and smooths the values for the virtual axes."""
         live = self.config.live_params
         store = self.app_context.modulation_source_store
-
-        accel_floor = live.get('motion_accel_floor', 50.0)
-        effective_accel_ceiling = max(self._cached_max_accel, accel_floor)
 
         # V-R0 (Twist)
         stiffness = live.get('vas_vr0_stiffness', 200.0)
         damping = live.get('vas_vr0_damping', 15.0)
         spring_force = -stiffness * self.vr0_position
         damping_force = -damping * self.vr0_velocity
-        input_force = np.sign(raw_accel) * norm_speed * 100
+        input_force = np.sign(signed_norm_accel) * norm_speed * 100
         acceleration = input_force + spring_force + damping_force
         self.vr0_velocity += acceleration * delta_time
         self.vr0_position += self.vr0_velocity * delta_time
@@ -1136,7 +1135,6 @@ class ModulationSourceManager:
         b = live.get('vas_inertia_damping', 4.0)
         mass = max(0.01, mass)
 
-        signed_norm_accel = np.clip(raw_accel / effective_accel_ceiling, -1.0, 1.0)
         inertial_force = -signed_norm_accel * 100.0
 
         spring_force = -k * self.vl1_position
@@ -1156,7 +1154,7 @@ class ModulationSourceManager:
         # V-V0 (Texture)
         stiffness = live.get('vas_vv0_stiffness', 300.0)
         damping = live.get('vas_vv0_damping', 20.0)
-        input_force = norm_jolt
+        input_force = normalized_jolt
         spring_force = -stiffness * self.vv0_position
         damping_force = -damping * self.vv0_velocity
         acceleration = (input_force * 100) + spring_force + damping_force
