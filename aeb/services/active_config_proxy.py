@@ -27,12 +27,17 @@ class ActiveConfigProxy:
         """
         Retrieves the complete dictionary for the currently active scene slot.
 
+        The active scene is always stored in the single active slot
+        (``active_scene_slot_index``), regardless of the playlist's
+        ``active_scene_index`` display identity. Playlist transitions
+        atomically replace this slot's contents.
+
         Returns:
             The settings dictionary for the active scene. Returns an empty
             dictionary if the slot is not found.
         """
         return self.app_context.scene_slots.get(
-            self.app_context.active_transition_state.get('active_scene_index', 0),
+            self.app_context.active_scene_slot_index,
             {}
         )
 

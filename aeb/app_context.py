@@ -346,7 +346,10 @@ class AppContext:
         for key in mod_sources_to_reset:
             self.modulation_source_store.set_source(key, 0.0)
 
-        self.active_transition_state.update({'stage': 'idle', 'active_scene_index': 0, 'target_scene_index': 0,
-                                             'start_time': 0.0, 'ramp_down_duration_s': 0.0, 'ramp_up_duration_s': 0.0, 'volume_multiplier': 1.0})
+        active_scene_index = self.active_transition_state.get('active_scene_index', 0)
+        self.active_transition_state.update({'stage': 'idle', 'active_scene_index': active_scene_index,
+                                             'target_scene_index': 0,
+                                             'start_time': 0.0, 'ramp_down_duration_s': 0.0,
+                                             'ramp_up_duration_s': 0.0, 'volume_multiplier': 1.0})
         self.signals.log_message.emit(
             "All scene-related state has been reset.")
