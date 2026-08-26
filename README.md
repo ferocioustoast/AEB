@@ -49,7 +49,7 @@ AEB's core principle is to use **Input Sources** to generate normalized control 
 2.  Download the latest [**AEB executable** from the project's Releases page](https://github.com/ferocioustoast/AEB/releases/latest).
 3.  Run the executable.
 
-#### Recommended Method: Python (All Platforms, Latest Updates)
+#### Universal Method: Python (All Platforms, Latest Updates)
 _Requires [Python](https://www.python.org/downloads/) (3.8+ recommended) to be installed and added to your system's PATH._
 
 For maximum stability and to prevent conflicts with other Python packages, it is **recommended** to run AEB in a dedicated virtual environment.
