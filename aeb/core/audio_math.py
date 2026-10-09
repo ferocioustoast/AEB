@@ -174,33 +174,50 @@ def generate_white_noise(amplitude_param: float, num_samples: int) -> np.ndarray
     return (noise * amplitude_param).astype(np.float32)
 
 
-def generate_brown_noise(amplitude_param: float, num_samples: int) -> np.ndarray:
+def generate_brown_noise(amplitude_param: float, num_samples: int,
+                         state=None) -> np.ndarray:
     """
-    Generates a block of brown (Brownian/Red) noise by integrating
-    white noise.
+    Generates a block of brown (Brownian/Red) noise using a leaky
+    integrator that preserves state across blocks.
+
+    The leaky integrator ``y[n] = (y[n-1] + 0.02 * w[n]) / 1.02`` keeps the
+    output bounded within [-1, 1] and guarantees that consecutive blocks are
+    continuous (no clicks at block boundaries).
 
     Args:
         amplitude_param: The amplitude multiplier for the noise.
         num_samples: The number of samples to generate.
+        state: Optional list-like (length >= 1) holding the previous block's
+            final output value in ``state[0]``. When provided it is mutated in
+            place to the new final value so callers can chain blocks without
+            discontinuities. If None, the block starts from zero (stateless).
 
     Returns:
-        A NumPy array of brown noise samples.
+        A NumPy array of brown noise samples scaled by ``amplitude_param``.
     """
     num_samples = int(num_samples)
     if num_samples <= 0:
         return np.array([], dtype=np.float32)
 
+    if amplitude_param == 0.0:
+        return np.zeros(num_samples, dtype=np.float32)
+
+    last_output = float(state[0]) if state is not None else 0.0
     white_noise = np.random.uniform(-1.0, 1.0, num_samples)
-    brown_noise_unscaled = np.cumsum(white_noise)
-    max_abs_value = np.max(np.abs(brown_noise_unscaled))
 
-    if max_abs_value > 1e-6:
-        brown_noise_scaled = brown_noise_unscaled / max_abs_value
-    else:
-        brown_noise_scaled = brown_noise_unscaled
+    # One-pole leaky integrator y[n] = r*y[n-1] + k*r*w[n] with r = 1/1.02.
+    # zi = -a[1] * y[-1] initializes lfilter to continue from last_output.
+    r = 1.0 / 1.02
+    k = 0.02
+    brown_unscaled, _ = scipy_signal.lfilter(
+        [k * r, 0.0], [1.0, -r], white_noise, zi=[r * last_output]
+    )
+    if state is not None:
+        state[0] = float(brown_unscaled[-1])
 
-    final_noise = brown_noise_scaled * amplitude_param
-    return final_noise.astype(np.float32)
+    if amplitude_param != 1.0:
+        brown_unscaled *= amplitude_param
+    return brown_unscaled.astype(np.float32)
 
 
 def calculate_formant_coeffs(vowel_position: float, shift_factor: float, 

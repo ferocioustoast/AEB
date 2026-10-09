@@ -14,6 +14,7 @@ class NoiseGenerator(AudioGeneratorBase):
     Generates various types of noise (white, brown, pink).
     """
     def __init__(self, app_context, initial_config, sample_rate):
+        self.brown_noise_state = [0.0]
         super().__init__(app_context, initial_config, sample_rate)
         self.pink_noise_filter_zi = None
         self.pink_b_filt = np.array([
@@ -36,6 +37,7 @@ class NoiseGenerator(AudioGeneratorBase):
         super().update_config(new_config_dict)
         if self.config.get('type') != old_type:
             self.pink_noise_filter_zi = None
+            self.brown_noise_state[0] = 0.0
 
     def _synthesize_block(self, params: dict, num_samples: int):
         """
@@ -50,7 +52,7 @@ class NoiseGenerator(AudioGeneratorBase):
                 1.0, num_samples)
         elif wave_type == 'brown_noise':
             self.output_buffer[:num_samples] = generate_brown_noise(
-                1.0, num_samples)
+                1.0, num_samples, self.brown_noise_state)
         elif wave_type == 'pink_noise':
             self._generate_pink_noise(num_samples)
         else:

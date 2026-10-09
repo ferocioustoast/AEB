@@ -6,6 +6,7 @@ all internal modulation sources.
 import collections
 import math
 import random
+import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List
@@ -57,6 +58,8 @@ class ModulationSourceManager:
         self.app_context = app_context
         self.config = initial_config
         self.update_rate_hz = update_rate_hz
+
+        self._reset_requested = threading.Event()
         
         self.last_motion_value: float = 0.0
         self.last_motion_speed: float = 0.0
@@ -187,7 +190,17 @@ class ModulationSourceManager:
             self.resize_history_buffers(new_window)
 
     def reset(self):
-        """Resets all internal variables."""
+        """Requests a reset of all internal state.
+
+        The actual reset is deferred until the engine thread's next
+        ``update_generative_sources`` call so it never races the concurrent
+        mutation of internal state (heat map, history deques, loop state,
+        System LFO states) performed on that thread.
+        """
+        self._reset_requested.set()
+
+    def _perform_reset(self):
+        """Resets all internal variables. Runs on the engine thread."""
         current_time = time.perf_counter()
         self.last_motion_value = 0.0
         self.last_motion_speed = 0.0
@@ -281,6 +294,9 @@ class ModulationSourceManager:
 
     def update_generative_sources(self, delta_time: float, effective_lfos: List[dict]):
         """Updates time-based, random, drift, and motion-derived sources."""
+        if self._reset_requested.is_set():
+            self._reset_requested.clear()
+            self._perform_reset()
         current_time = time.perf_counter()
         self._update_motion_derived_sources(current_time, delta_time)
         self._update_time_source(delta_time)
@@ -1247,7 +1263,7 @@ class ModulationSourceManager:
             phase_offset = lfo.get('phase_offset', 0.0) * 2 * np.pi
             phase_increment = (2 * np.pi * freq) * delta_time
             state['phase'] = (state['phase'] + phase_increment) % (2 * np.pi)
-            current_phase = state['phase'] + phase_offset
+            current_phase = (state['phase'] + phase_offset) % (2 * np.pi)
 
             waveform = lfo.get('waveform', 'sine')
             bipolar_val = 0.0

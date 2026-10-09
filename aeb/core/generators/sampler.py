@@ -30,7 +30,12 @@ class SamplerGenerator(AudioGeneratorBase):
         self.original_sample_pitch: float = 0.0
         self.playhead: float = 0.0
         self._last_known_filepath: Optional[str] = None
+        self._resolved_filepath: Optional[str] = None
         super().__init__(app_context, initial_config, sample_rate)
+
+    def _resolve_filepath(self) -> str:
+        """Resolves the configured sampler path once, off the audio hot path."""
+        return path_utils.resolve_sampler_path(self.config.get('sampler_filepath'))
 
     def update_config(self, new_config_dict: dict):
         """
@@ -48,6 +53,8 @@ class SamplerGenerator(AudioGeneratorBase):
             self.original_sample_pitch = self.config.get(
                 'sampler_original_pitch', 0.0
             )
+            self._resolved_filepath = self._resolve_filepath()
+            self._last_known_filepath = None
 
     def _get_or_update_sample_data_reference(self) -> bool:
         """
@@ -59,7 +66,9 @@ class SamplerGenerator(AudioGeneratorBase):
             True if valid sample data is available for processing, False otherwise.
         """
         stored_path = self.config.get('sampler_filepath')
-        resolved_path = path_utils.resolve_sampler_path(stored_path)
+        if self._resolved_filepath is None:
+            self._resolved_filepath = path_utils.resolve_sampler_path(stored_path)
+        resolved_path = self._resolved_filepath
 
         if self._last_known_filepath == resolved_path and \
                 self.sample_data is not None:

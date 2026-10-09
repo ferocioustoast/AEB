@@ -18,7 +18,10 @@ from PySide6.QtCore import Slot
 from aeb.app_context import EngineConfig
 from aeb.config.constants import DEFAULT_SETTINGS
 from aeb.core.audio_math import generate_lfo_signal_normalized
-from aeb.core.modulation_processor import apply_modulations_to_parameters
+from aeb.core.modulation_processor import (
+    _coerce_clamp,
+    apply_modulations_to_parameters,
+)
 from aeb.services.modulation_source_manager import ModulationSourceManager
 from aeb.services.scene_transition_manager import SceneTransitionManager
 from aeb.ui.widgets.audio_general_tab import LUT_RESOLUTION
@@ -75,6 +78,8 @@ class ModulationEngine:
         self._effective_lfo_params: list = []
         self._scene_trigger_states: dict[int, bool] = {}
         self._lock = threading.Lock()
+        self._last_update_error_key = None
+        self._last_update_error_time = 0.0
 
     def run(self):
         """The main run loop for the modulation engine thread."""
@@ -85,8 +90,11 @@ class ModulationEngine:
         self.last_update_time = time.perf_counter()
         while not self._stop_event.is_set():
             loop_start_time = time.perf_counter()
-            self._check_for_config_update()
-            self._update()
+            try:
+                self._check_for_config_update()
+                self._update()
+            except Exception as exc:
+                self._log_update_error(exc)
             elapsed = time.perf_counter() - loop_start_time
             sleep_duration = self.update_interval_s - elapsed
             if sleep_duration > 0:
@@ -94,6 +102,19 @@ class ModulationEngine:
         self.is_running = False
         self.app_context.signals.log_message.emit(
             "Central Modulation Engine thread stopped.")
+
+    def _log_update_error(self, exc: Exception):
+        """Logs a throttled error so a persistent failure cannot spam the UI."""
+        key = (type(exc).__name__, str(exc))
+        now = time.perf_counter()
+        if key != self._last_update_error_key or \
+                now - self._last_update_error_time > 30.0:
+            self._last_update_error_key = key
+            self._last_update_error_time = now
+            self.app_context.signals.log_message.emit(
+                f"ERROR: Modulation engine update failed: "
+                f"{type(exc).__name__}: {exc}")
+            logging.exception("Modulation engine update failed")
 
     def stop(self):
         """Signals the run loop to terminate."""
@@ -169,8 +190,8 @@ class ModulationEngine:
                 else:
                     continue
 
-                min_clamp = float(rule.get('clamp_min', -np.inf))
-                max_clamp = float(rule.get('clamp_max', np.inf))
+                min_clamp = _coerce_clamp(rule.get('clamp_min'), -np.inf)
+                max_clamp = _coerce_clamp(rule.get('clamp_max'), np.inf)
                 clamped_val = np.clip(new_val, min_clamp, max_clamp)
 
                 self.app_context.state_variables[var_name] = clamped_val
@@ -514,8 +535,8 @@ class ModulationEngine:
                 elif operation == 'subtract':
                     new_val = current_val - mod_value
 
-                min_clamp = float(rule.get('clamp_min', -np.inf))
-                max_clamp = float(rule.get('clamp_max', np.inf))
+                min_clamp = _coerce_clamp(rule.get('clamp_min'), -np.inf)
+                max_clamp = _coerce_clamp(rule.get('clamp_max'), np.inf)
                 clamped_val = np.clip(new_val, min_clamp, max_clamp)
                 self.app_context.state_variables[var_name] = clamped_val
                 if abs(clamped_val - current_val) > 1e-5:

@@ -76,6 +76,9 @@ class AudioGeneratorBase(ABC):
         Returns:
             A NumPy array view of the generated audio samples.
         """
+        if num_samples > len(self.output_buffer):
+            self.output_buffer = np.zeros(num_samples, dtype=np.float32)
+            self.envelope_buffer = np.zeros(num_samples, dtype=np.float32)
         self._synthesize_block(params, num_samples)
         return self.output_buffer[:num_samples]
 

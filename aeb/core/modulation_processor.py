@@ -12,6 +12,33 @@ if TYPE_CHECKING:
     from aeb.app_context import AppContext
 
 
+def _coerce_bool(value) -> bool:
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, float, np.number)):
+        return float(value) > 0.5
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s in ('true', '1', 'yes', 'on', 'enable', 'enabled'):
+            return True
+        if s in ('false', '0', 'no', 'off', 'disable', 'disabled'):
+            return False
+        try:
+            return float(s) > 0.5
+        except ValueError:
+            pass
+    return False
+
+
+def _coerce_clamp(value, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def apply_modulations_to_parameters(
         app_context: 'AppContext',
         target_prefix: str,
@@ -118,9 +145,20 @@ def apply_modulations_to_parameters(
                     'randomize_loop_speed', 'randomize_loop_range'
                 }
                 if r_param in bool_params:
-                    eff_params[r_param] = float(value_to_set) > 0.5
+                    eff_params[r_param] = _coerce_bool(value_to_set)
                 else:
-                    eff_params[r_param] = value_to_set
+                    target_val = eff_params.get(r_param)
+                    if isinstance(value_to_set, str) and isinstance(
+                            target_val, (int, float, bool, np.number)):
+                        if idx not in app_context.warned_mod_rule_indices:
+                            app_context.signals.log_message.emit(
+                                f"WARNING: Mod Rule {idx+1} uses mode 'set' "
+                                "with a non-numerical amount on parameter "
+                                f"'{r_param}'. Rule will be ignored."
+                            )
+                            app_context.warned_mod_rule_indices.add(idx)
+                    else:
+                        eff_params[r_param] = value_to_set
             continue
 
         curve = rule.get('curve', 'linear')
@@ -170,10 +208,11 @@ def apply_modulations_to_parameters(
         elif r_param.startswith('h') and r_param.endswith('_amp') and 'harmonics' in eff_params:
             try:
                 h_idx = int(r_param[1:-4]) - 1
-                h_list = eff_params['harmonics']
+                h_list = list(eff_params['harmonics'])
                 if 0 <= h_idx < len(h_list):
                     h_list[h_idx] = np.clip(
                         h_list[h_idx] + mod_value, 0.0, 1.0)
+                eff_params['harmonics'] = h_list
             except (ValueError, IndexError):
                 pass
         elif r_param in eff_params:
@@ -182,10 +221,10 @@ def apply_modulations_to_parameters(
             elif mode == 'multiplicative':
                 eff_params[r_param] *= (1.0 + mod_value)
 
-            min_clamp = float(rule.get('clamp_min', -np.inf))
-            max_clamp = float(rule.get('clamp_max', np.inf))
+            min_clamp = _coerce_clamp(rule.get('clamp_min'), -np.inf)
+            max_clamp = _coerce_clamp(rule.get('clamp_max'), np.inf)
 
-            if isinstance(eff_params.get(r_param), (int, float)):
+            if isinstance(eff_params.get(r_param), (int, float, np.number)):
                 eff_params[r_param] = np.clip(
                     eff_params[r_param], min_clamp, max_clamp)
 

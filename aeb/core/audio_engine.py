@@ -4,6 +4,7 @@ Contains the AudioGenerator wrapper/factory, the core class for synthesizing
 a single, stateful audio waveform.
 """
 import copy
+import functools
 from typing import TYPE_CHECKING, Optional, List
 
 import numpy as np
@@ -15,6 +16,45 @@ from aeb.core.audio_math import calculate_formant_coeffs
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
+
+
+@functools.lru_cache(maxsize=512)
+def _design_filter_coeffs(fs: int, f_type: str, cutoff: float, q: float,
+                          vowel: float):
+    """
+    Designs SOS filter coefficients, memoized so the audio engine never runs
+    an expensive design (e.g. scipy.signal.butter) twice for the same
+    parameter combination. Standard modes return an ndarray SOS; formant mode
+    returns a list of 3 SOS arrays; invalid designs return None.
+    """
+    if f_type == 'formant':
+        return calculate_formant_coeffs(vowel, cutoff, q, fs)
+
+    nyquist = 0.5 * fs
+    cutoff = float(np.clip(cutoff, 1.0, nyquist - 1.0))
+    new_sos = None
+
+    try:
+        if f_type == 'lowpass':
+            new_sos = scipy_signal.butter(
+                2, cutoff, btype='low', fs=fs, output='sos')
+        elif f_type == 'highpass':
+            new_sos = scipy_signal.butter(
+                2, cutoff, btype='high', fs=fs, output='sos')
+        elif f_type == 'bandpass':
+            bw = cutoff / q
+            low = np.clip(cutoff - (bw / 2.0), 1.0, nyquist - 2.0)
+            high = np.clip(cutoff + (bw / 2.0), low + 1.0, nyquist - 1.0)
+            if low < high:
+                new_sos = scipy_signal.butter(
+                    1, [low, high], btype='band', fs=fs, output='sos')
+        elif f_type == 'notch':
+            b, a = scipy_signal.iirnotch(cutoff, q, fs=fs)
+            new_sos = scipy_signal.tf2sos(b, a)
+    except ValueError:
+        new_sos = None
+
+    return new_sos
 
 
 class AudioGenerator:
@@ -143,7 +183,7 @@ class AudioGenerator:
             'filter_formant_vowel': float(cfg.get('filter_formant_vowel', 0.0)),
             'lfo_enabled': cfg.get('lfo_enabled', False),
             'filter_enabled': cfg.get('filter_enabled', False),
-            'harmonics': cfg.get('harmonics', [1.0] + [0.0] * 15),
+            'harmonics': list(cfg.get('harmonics', [1.0] + [0.0] * 15)),
             'pan': float(cfg.get('pan', 0.0)),
             'spectral_tilt': float(cfg.get('spectral_tilt', 0.0)),
             'odd_even_bias': float(cfg.get('odd_even_bias', 0.0)),
@@ -300,20 +340,22 @@ class AudioGenerator:
         if f_vowel is None:
             f_vowel = float(self.config.get('filter_formant_vowel', 0.0))
 
+        new_sos = _design_filter_coeffs(
+            self.sample_rate, f_type, float(f_cutoff), float(f_q),
+            float(f_vowel)
+        )
+
         # --- FORMANT MODE ---
         if f_type == 'formant':
             # Reset standard filter state to prevent crossover garbage
             if not isinstance(self.sos_coeffs, list):
                 self.filter_zi = None
-            
-            # Use f_cutoff as 'shift_factor' and f_q as 'q_factor'
-            new_coeffs_list = calculate_formant_coeffs(f_vowel, f_cutoff, f_q, self.sample_rate)
-            
+
             # Check state consistency
             if self.sos_coeffs is None or not isinstance(self.sos_coeffs, list):
                 self.formant_filter_zi = [None, None, None]
-            
-            self.sos_coeffs = new_coeffs_list
+
+            self.sos_coeffs = new_sos
             return
         # --------------------
 
@@ -321,35 +363,6 @@ class AudioGenerator:
         # Reset formant state
         if isinstance(self.sos_coeffs, list):
             self.formant_filter_zi = [None, None, None]
-
-        nyquist = 0.5 * self.sample_rate
-        f_cutoff = np.clip(f_cutoff, 1.0, nyquist - 1.0)
-        
-        new_sos = None
-
-        try:
-            if f_type == 'lowpass':
-                new_sos = scipy_signal.butter(
-                    2, f_cutoff, btype='low', fs=self.sample_rate, output='sos'
-                )
-            elif f_type == 'highpass':
-                new_sos = scipy_signal.butter(
-                    2, f_cutoff, btype='high', fs=self.sample_rate, output='sos'
-                )
-            elif f_type == 'bandpass':
-                bw = f_cutoff / f_q
-                low = np.clip(f_cutoff - (bw / 2.0), 1.0, nyquist - 2.0)
-                high = np.clip(f_cutoff + (bw / 2.0), low + 1.0, nyquist - 1.0)
-                if low < high:
-                    new_sos = scipy_signal.butter(
-                        1, [low, high], btype='band', fs=self.sample_rate,
-                        output='sos'
-                    )
-            elif f_type == 'notch':
-                b, a = scipy_signal.iirnotch(f_cutoff, f_q, fs=self.sample_rate)
-                new_sos = scipy_signal.tf2sos(b, a)
-        except ValueError:
-            new_sos = None
 
         # State Preservation Logic
         if new_sos is not None:

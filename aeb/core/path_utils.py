@@ -7,6 +7,9 @@ import os
 from aeb.config.constants import CONFIG_FILE_PATH
 
 
+_SAMPLES_DIR_CACHE = None
+
+
 def get_samples_dir() -> str:
     """
     Calculates and returns the absolute path to the 'Samples' directory.
@@ -14,13 +17,20 @@ def get_samples_dir() -> str:
     The 'Samples' directory is expected to be in the same root folder as the
     main configuration file.
 
+    The result (including the directory creation) is memoized for the lifetime
+    of the process so that this filesystem operation is never repeated on the
+    audio-path hot loop. Returns the same absolute path every call.
+
     Returns:
         The absolute path to the canonical Samples directory.
     """
-    config_dir = os.path.dirname(os.path.abspath(CONFIG_FILE_PATH))
-    samples_dir = os.path.join(config_dir, "Samples")
-    os.makedirs(samples_dir, exist_ok=True)
-    return samples_dir
+    global _SAMPLES_DIR_CACHE
+    if _SAMPLES_DIR_CACHE is None:
+        config_dir = os.path.dirname(os.path.abspath(CONFIG_FILE_PATH))
+        samples_dir = os.path.join(config_dir, "Samples")
+        os.makedirs(samples_dir, exist_ok=True)
+        _SAMPLES_DIR_CACHE = samples_dir
+    return _SAMPLES_DIR_CACHE
 
 
 def relativize_sampler_path(absolute_path: str) -> str:
