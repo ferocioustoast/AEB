@@ -492,6 +492,10 @@ class ConfigurationManager:
             'sampler_loop_start': (0.0, 1.0), 'sampler_loop_end': (0.0, 1.0),
             'sampler_loop_crossfade_ms': (0.0, 100.0),
             'sampler_scrub_speed_limit': (0.0, 1000000.0),
+            'pulse_rate_hz': (0.5, 300.0),
+            'pulse_width_ms': (0.05, 200.0),
+            'pulse_jitter': (0.0, 1.0),
+            'pulse_omit': (0.0, 0.95),
         }
 
         for key, (min_val, max_val) in float_params.items():

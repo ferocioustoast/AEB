@@ -120,7 +120,7 @@ class StandardInspector(InspectorPanelBase):
         self.type_combo = QComboBox()
         self.type_combo.addItems([
             'sine', 'square', 'sawtooth', 'triangle', 'white_noise',
-            'brown_noise', 'pink_noise', 'additive', 'sampler'
+            'brown_noise', 'pink_noise', 'additive', 'sampler', 'pulsetrain'
         ])
         self.type_combo.setToolTip("Selects the fundamental synthesis algorithm.")
         layout.addRow("Type:", self.type_combo)

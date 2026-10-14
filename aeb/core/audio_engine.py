@@ -95,6 +95,7 @@ class AudioGenerator:
         from aeb.core.generators.additive import AdditiveGenerator
         from aeb.core.generators.noise import NoiseGenerator
         from aeb.core.generators.periodic import PeriodicGenerator
+        from aeb.core.generators.pulsetrain import PulseTrainGenerator
         from aeb.core.generators.sampler import SamplerGenerator
         wave_type = self.config.get('type', 'sine').lower()
         generator_map = {
@@ -102,7 +103,7 @@ class AudioGenerator:
             'sawtooth': PeriodicGenerator, 'triangle': PeriodicGenerator,
             'white_noise': NoiseGenerator, 'brown_noise': NoiseGenerator,
             'pink_noise': NoiseGenerator, 'additive': AdditiveGenerator,
-            'sampler': SamplerGenerator,
+            'sampler': SamplerGenerator, 'pulsetrain': PulseTrainGenerator,
         }
         generator_class = generator_map.get(wave_type, PeriodicGenerator)
         return generator_class(self.app_context, self.config, self.sample_rate)
@@ -175,6 +176,10 @@ class AudioGenerator:
             'duty_cycle': float(cfg.get('duty_cycle', 1.0)),
             'shape_morph': float(cfg.get('shape_morph', 0.0)),
             'phase_jitter_amount': float(cfg.get('phase_jitter_amount', 0.0)),
+            'pulse_rate_hz': float(cfg.get('pulse_rate_hz', 40.0)),
+            'pulse_width_ms': float(cfg.get('pulse_width_ms', 2.0)),
+            'pulse_jitter': float(cfg.get('pulse_jitter', 0.0)),
+            'pulse_omit': float(cfg.get('pulse_omit', 0.0)),
             'lfo_frequency': float(cfg.get('lfo_frequency', 1.0)),
             'lfo_depth': float(cfg.get('lfo_depth', 0.5)),
             'filter_cutoff_frequency': float(

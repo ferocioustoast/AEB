@@ -240,6 +240,11 @@ class ModulationMatrixTab(QWidget):
         elif wave_type in ['sawtooth', 'triangle']:
             params.append('duty_cycle')
 
+        elif wave_type == 'pulsetrain':
+            params.extend([
+                'pulse_rate_hz', 'pulse_width_ms', 'pulse_jitter', 'pulse_omit'
+            ])
+
         return sorted(params)
 
     def _update_param_combo(self, row: int, target_widget: QWidget, params: list, sub_target_text: str):

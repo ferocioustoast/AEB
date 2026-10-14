@@ -19,6 +19,7 @@ from aeb.core.generators.sampler import SamplerGenerator
 from aeb.ui.workers import AnalysisWorker
 from aeb.ui.widgets.inspectors.additive_inspector import AdditiveInspector
 from aeb.ui.widgets.inspectors.preset_showcase import PresetShowcase
+from aeb.ui.widgets.inspectors.pulse_inspector import PulseTrainInspector
 from aeb.ui.widgets.inspectors.sampler_inspector import SamplerInspector
 from aeb.ui.widgets.inspectors.standard_inspector import StandardInspector
 
@@ -240,13 +241,15 @@ class WaveformsOscilloscopeTab(QWidget):
         self.standard_inspector_panel = StandardInspector(self.app_context, self.main_window)
         self.additive_inspector_panel = AdditiveInspector(self.app_context, self.main_window)
         self.sampler_inspector_panel = SamplerInspector(self.app_context, self.main_window)
+        self.pulse_inspector_panel = PulseTrainInspector(self.app_context, self.main_window)
         self.preset_showcase_panel = PresetShowcase(self.app_context, self.main_window)
         self.inspector_stack.addWidget(self.standard_inspector_panel)
         self.inspector_stack.addWidget(self.additive_inspector_panel)
         self.inspector_stack.addWidget(self.sampler_inspector_panel)
+        self.inspector_stack.addWidget(self.pulse_inspector_panel)
         self.inspector_stack.addWidget(self.preset_showcase_panel)
         self.inspector_stack.setEnabled(False)
-        for inspector in [self.standard_inspector_panel, self.additive_inspector_panel, self.sampler_inspector_panel]:
+        for inspector in [self.standard_inspector_panel, self.additive_inspector_panel, self.sampler_inspector_panel, self.pulse_inspector_panel]:
             inspector.setting_changed.connect(self._on_inspector_value_changed)
             inspector.copy_btn.clicked.connect(self._handle_copy_wave)
             inspector.paste_btn.clicked.connect(self._handle_paste_wave)
@@ -284,6 +287,9 @@ class WaveformsOscilloscopeTab(QWidget):
             internal_gen = generator_wrapper.get_internal_generator()
             sampler_gen = internal_gen if isinstance(internal_gen, SamplerGenerator) else None
             self.sampler_inspector_panel.populate(conf, sampler_gen)
+        elif wave_type == 'pulsetrain':
+            self.inspector_stack.setCurrentWidget(self.pulse_inspector_panel)
+            self.pulse_inspector_panel.populate(conf)
         else:
             self.inspector_stack.setCurrentWidget(self.standard_inspector_panel)
             self.standard_inspector_panel.populate(conf)

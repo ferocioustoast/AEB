@@ -173,7 +173,7 @@ class SamplerInspector(InspectorPanelBase):
         self.type_combo = QComboBox()
         self.type_combo.addItems([
             'sampler', 'sine', 'square', 'sawtooth', 'triangle',
-            'white_noise', 'brown_noise', 'pink_noise', 'additive'
+            'white_noise', 'brown_noise', 'pink_noise', 'additive', 'pulsetrain'
         ])
         layout.addRow("Type:", self.type_combo)
         

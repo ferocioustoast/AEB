@@ -589,6 +589,19 @@ class ModulationEngine:
             mod = 1.0 + lfo_signal * depth
             eff_params['frequency'] = np.maximum(
                 0.01, eff_params['frequency'] * mod)
+        elif target == 'pulse_rate' and cfg.get('type') == 'pulsetrain':
+            mod = 1.0 + lfo_signal * depth
+            eff_params['pulse_rate_hz'] = np.maximum(
+                0.5, eff_params['pulse_rate_hz'] * mod)
+        elif target == 'pulse_width_ms' and cfg.get('type') == 'pulsetrain':
+            mod = eff_params['pulse_width_ms'] + lfo_signal * depth
+            eff_params['pulse_width_ms'] = np.clip(mod, 0.05, 200.0)
+        elif target == 'pulse_jitter' and cfg.get('type') == 'pulsetrain':
+            mod = eff_params['pulse_jitter'] + lfo_signal * depth
+            eff_params['pulse_jitter'] = np.clip(mod, 0.0, 1.0)
+        elif target == 'pulse_omit' and cfg.get('type') == 'pulsetrain':
+            mod = eff_params['pulse_omit'] + lfo_signal * depth
+            eff_params['pulse_omit'] = np.clip(mod, 0.0, 0.95)
         elif target == 'amplitude':
             mod = 1.0 + lfo_signal * depth
             eff_params['amplitude'] = np.maximum(
