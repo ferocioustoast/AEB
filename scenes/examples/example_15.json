@@ -37,16 +37,16 @@
             "source": "Internal: Transient Impulse",
             "target": "ambient.0.amplitude",
             "amount": 1.0,
-            "mode": "set",
-            "comment": "Maps the physics ripple to the chassis sound."
+            "mode": "additive",
+            "comment": "Additive from a base of 0.0 so the chassis rings in proportion to the impact instead of a fixed level."
         },
         {
             "enabled": true,
             "source": "Primary Motion: Speed",
             "target": "Master.spatial_phase_offset",
             "amount": -0.4,
-            "mode": "set",
-            "comment": "Negative offset TEARS the sensation apart at high speeds."
+            "mode": "additive",
+            "comment": "Additive from a base of 0.0 so the tear scales with speed (negative offset = anti-phase pulling apart)."
         }
     ]
 }

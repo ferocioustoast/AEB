@@ -10,13 +10,10 @@
         ]
     },
     "sound_waves": {
-        "left": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_depth": 0.0 } ],
-        "right": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_depth": 0.0 } ],
+        "left": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_frequency": 6.0, "lfo_depth": 0.0 } ],
+        "right": [ { "type": "sine", "frequency": 600.0, "amplitude": 0.8, "lfo_enabled": true, "lfo_frequency": 6.0, "lfo_depth": 0.0 } ],
         "ambient": []
     },
-    "system_lfos": [
-        { "name": "Wobble", "frequency": 6.0, "waveform": "sine" }
-    ],
     "somatic_excitation_buildup_s": 30.0,
     "somatic_excitation_decay_s": 10.0,
     "somatic_excitation_cooldown_s": 5.0,
@@ -26,8 +23,16 @@
             "source": "Internal: System Excitation",
             "target": "left.0.lfo_depth",
             "amount": 0.8,
-            "mode": "set",
-            "comment": "Sets LFO depth based on Excitation level."
+            "mode": "additive",
+            "comment": "Additive from a base of 0.0 so the wobble depth tracks the Excitation level instead of jumping to a fixed value."
+        },
+        {
+            "enabled": true,
+            "source": "Internal: System Excitation",
+            "target": "right.0.lfo_depth",
+            "amount": 0.8,
+            "mode": "additive",
+            "comment": "Same as the left channel so both channels wobble together."
         }
     ]
 }

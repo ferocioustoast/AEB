@@ -58,8 +58,8 @@
             "target": "left.0.amplitude",
             "amount": 0.5,
             "mode": "additive",
-            "clamp_min": 0.0,
-            "comment": "UNIPOLAR: Clamp Min 0.0 ensures we only boost volume on Withdrawal (Positive)."
+            "clamp_min": 0.5,
+            "comment": "Clamp Min = base amplitude (0.5) so insertion keeps the base level; only Withdrawal (Positive) boosts volume."
         },
         {
             "enabled": true,
@@ -67,8 +67,8 @@
             "target": "right.0.amplitude",
             "amount": 0.5,
             "mode": "additive",
-            "clamp_min": 0.0,
-            "comment": "UNIPOLAR: Clamp Min 0.0 ensures we only boost volume on Withdrawal (Positive)."
+            "clamp_min": 0.5,
+            "comment": "Same as the left channel."
         }
     ]
 }

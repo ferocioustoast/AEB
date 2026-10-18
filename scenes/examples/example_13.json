@@ -30,14 +30,16 @@
             "source": "Internal: Tension",
             "target": "left.1.amplitude",
             "amount": 1.0,
-            "mode": "set"
+            "mode": "additive",
+            "comment": "Additive from a base of 0.0 so the friction layer swells with Tension and dips to silence at the turnarounds."
         },
         {
             "enabled": true,
             "source": "Internal: Tension",
             "target": "right.1.amplitude",
             "amount": 1.0,
-            "mode": "set"
+            "mode": "additive",
+            "comment": "Same as the left channel."
         }
     ]
 }
