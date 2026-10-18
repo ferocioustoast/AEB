@@ -70,6 +70,10 @@ class AdditiveInspector(InspectorPanelBase):
             self.jitter_slider.setValue(int(jitter_val * 100))
             self.jitter_spinbox.setValue(jitter_val)
 
+            phase_val = conf.get('phase_offset', 0.0)
+            self.phase_offset_slider.setValue(int(round(phase_val * 100)))
+            self.phase_offset_spinbox.setValue(phase_val)
+
             # Macro Parameters
             morph_val = conf.get('shape_morph', 0.0)
             self.morph_slider.setValue(int(morph_val * 100))
@@ -192,6 +196,26 @@ class AdditiveInspector(InspectorPanelBase):
         pan_layout.addWidget(self.pan_slider)
         pan_layout.addWidget(self.pan_spinbox)
         layout.addRow("Pan:", pan_layout_widget)
+
+        phase_layout_widget = QWidget()
+        phase_layout = QHBoxLayout(phase_layout_widget)
+        phase_layout.setContentsMargins(0, 0, 0, 0)
+        phase_layout.setSpacing(5)
+        self.phase_offset_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.phase_offset_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.phase_offset_spinbox = QDoubleSpinBox(
+            minimum=0.0, maximum=1.0, singleStep=0.05, decimals=2)
+        self.phase_offset_spinbox.setMinimumWidth(70)
+        self.phase_offset_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        phase_tip = (
+            "<b>Phase Offset:</b> Shifts the summed harmonics' own starting phase, 0.00 to\n"
+            "1.00 of a full turn (0.50 = 180\u00b0). Sits on top of the Master 'Channel Blend'."
+        )
+        self.phase_offset_slider.setToolTip(phase_tip)
+        self.phase_offset_spinbox.setToolTip(phase_tip)
+        phase_layout.addWidget(self.phase_offset_slider)
+        phase_layout.addWidget(self.phase_offset_spinbox)
+        layout.addRow("Phase Offset:", phase_layout_widget)
 
         return group
 
@@ -408,6 +432,7 @@ class AdditiveInspector(InspectorPanelBase):
             self.freq_spinbox: ('frequency', 'valueChanged'),
             self.amp_spinbox: ('amplitude', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
+            self.phase_offset_spinbox: ('phase_offset', 'valueChanged'),
             self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
             self.dec_spinbox: ('ads_decay_time', 'valueChanged'),
@@ -440,6 +465,11 @@ class AdditiveInspector(InspectorPanelBase):
             lambda val: self.pan_spinbox.setValue(val / 100.0))
         self.pan_spinbox.valueChanged.connect(
             lambda val: self.pan_slider.setValue(int(val * 100)))
+
+        self.phase_offset_slider.valueChanged.connect(
+            lambda val: self.phase_offset_spinbox.setValue(val / 100.0))
+        self.phase_offset_spinbox.valueChanged.connect(
+            lambda val: self.phase_offset_slider.setValue(int(round(val * 100))))
             
         self.jitter_slider.valueChanged.connect(
             lambda val: self.jitter_spinbox.setValue(val / 100.0))

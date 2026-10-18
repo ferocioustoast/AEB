@@ -383,6 +383,13 @@ class ConfigurationManager:
         complete_scene = copy.deepcopy(base_scene)
         complete_scene = self._deep_merge_dicts(complete_scene, partial_data)
 
+        if 'channel_phase_blend' in complete_scene:
+            try:
+                complete_scene['channel_phase_blend'] = min(
+                    1.0, max(0.0, float(complete_scene['channel_phase_blend'])))
+            except (ValueError, TypeError):
+                complete_scene['channel_phase_blend'] = DEFAULT_SETTINGS['channel_phase_blend']
+
         if 'sound_waves' in partial_data:
             complete_scene['sound_waves'] = self._normalize_sound_waves(partial_data.get('sound_waves', {}))
         if 'modulation_matrix' in partial_data:
@@ -481,6 +488,7 @@ class ConfigurationManager:
             'frequency': (1.0, 20000.0), 'amplitude': (0.0, 10.0),
             'duty_cycle': (0.01, 1.0), 'pan': (-1.0, 1.0),
             'phase_jitter_amount': (0.0, 1.0),
+            'phase_offset': (0.0, 1.0),
             'ads_attack_time': (0.0, 10.0), 'ads_decay_time': (0.0, 10.0),
             'ads_sustain_level': (0.0, 1.0), 'adsr_release_time': (0.0, 10.0),
             'lfo_frequency': (0.01, 100.0), 'lfo_depth': (0.0, 10.0),

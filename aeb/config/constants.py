@@ -115,6 +115,7 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'sampler_original_pitch': 100.0,
     'sampler_scrub_speed_limit': 80000.0,
     'pan': 0.0,
+    'phase_offset': 0.0,
     'spatial_mapping': None,
 }
 
@@ -213,6 +214,8 @@ DEFAULT_SETTINGS: dict = {
     'positional_ambient_mapping': None,
     'stereo_width': 1.0,
     'pan_offset': 0.0,
+    'channel_phase_blend': 0.0,
+    'channel_phase_slew_ms': 50.0,
     'ambient_panning_link_enabled': False,
     'zonal_pressure': 1.0,
     'spatial_phase_offset': 0.0,

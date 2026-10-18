@@ -111,6 +111,11 @@ class AdditiveGenerator(AudioGeneratorBase):
             jitter_offset = noise * jitter * 0.5 * np.pi
             fundamental_phases += jitter_offset
 
+        # --- Inter-channel / per-wave carrier phase offset ---
+        if isinstance(self._phase_trim_block, np.ndarray):
+            fundamental_phases += self._phase_trim_block
+        # ----------------------------------------------------
+
         harmonic_numbers = np.flatnonzero(active_h_mask) + 1
 
         # Broadcast multiply: (num_active_harmonics, 1) * (1, num_samples)

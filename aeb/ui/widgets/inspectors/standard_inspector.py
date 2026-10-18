@@ -83,6 +83,13 @@ class StandardInspector(InspectorPanelBase):
             self.pan_slider.setValue(int(pan_val * 100))
             self.pan_spinbox.setValue(pan_val)
 
+            phase_val = conf.get('phase_offset', 0.0)
+            self.phase_offset_slider.setValue(int(round(phase_val * 100)))
+            self.phase_offset_spinbox.setValue(phase_val)
+            phase_enabled = not is_noise and wave_type != 'sampler'
+            self.phase_offset_slider.setEnabled(phase_enabled)
+            self.phase_offset_spinbox.setEnabled(phase_enabled)
+
             spatial_map = conf.get('spatial_mapping')
             is_spatial_enabled = isinstance(spatial_map, dict) and spatial_map.get('enabled', False)
             self.spatial_mapping_checkbox.setChecked(is_spatial_enabled)
@@ -211,6 +218,33 @@ class StandardInspector(InspectorPanelBase):
         pan_layout.addWidget(self.pan_slider)
         pan_layout.addWidget(self.pan_spinbox)
         layout.addRow("Pan:", pan_layout_widget)
+
+        # --- Phase Offset ---
+        phase_layout_widget = QWidget()
+        phase_layout = QHBoxLayout(phase_layout_widget)
+        phase_layout.setContentsMargins(0, 0, 0, 0)
+        phase_layout.setSpacing(5)
+
+        self.phase_offset_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.phase_offset_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        self.phase_offset_spinbox = QDoubleSpinBox(
+            minimum=0.0, maximum=1.0, singleStep=0.05, decimals=2)
+        self.phase_offset_spinbox.setMinimumWidth(70)
+        self.phase_offset_spinbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+        phase_tip = (
+            "<b>Phase Offset:</b> Shifts this wave's own starting phase, 0.00 to 1.00 of a\n"
+            "full turn (0.50 = 180\u00b0). Sits on top of the Master 'Channel Blend'.\n"
+            "Lets a single layer sit out of step with the rest. Ignored by noise/sampler."
+        )
+        self.phase_offset_slider.setToolTip(phase_tip)
+        self.phase_offset_spinbox.setToolTip(phase_tip)
+
+        phase_layout.addWidget(self.phase_offset_slider)
+        phase_layout.addWidget(self.phase_offset_spinbox)
+        layout.addRow("Phase Offset:", phase_layout_widget)
+        # -----------------------------------
         return group
 
     def _create_spatial_mapping_group(self) -> QGroupBox:
@@ -352,6 +386,7 @@ class StandardInspector(InspectorPanelBase):
             self.duty_spinbox: ('duty_cycle', 'valueChanged'),
             self.morph_spinbox: ('shape_morph', 'valueChanged'),
             self.pan_spinbox: ('pan', 'valueChanged'),
+            self.phase_offset_spinbox: ('phase_offset', 'valueChanged'),
             self.jitter_spinbox: ('phase_jitter_amount', 'valueChanged'),
             self.atk_spinbox: ('ads_attack_time', 'valueChanged'),
             self.dec_spinbox: ('ads_decay_time', 'valueChanged'),
@@ -382,6 +417,11 @@ class StandardInspector(InspectorPanelBase):
             lambda val: self.pan_spinbox.setValue(val / 100.0))
         self.pan_spinbox.valueChanged.connect(
             lambda val: self.pan_slider.setValue(int(val * 100)))
+
+        self.phase_offset_slider.valueChanged.connect(
+            lambda val: self.phase_offset_spinbox.setValue(val / 100.0))
+        self.phase_offset_spinbox.valueChanged.connect(
+            lambda val: self.phase_offset_slider.setValue(int(round(val * 100))))
             
         self.jitter_slider.valueChanged.connect(
             lambda val: self.jitter_spinbox.setValue(val / 100.0))

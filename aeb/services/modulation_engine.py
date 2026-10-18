@@ -456,7 +456,7 @@ class ModulationEngine:
         for k in ['loop_speed_fastest', 'loop_speed_ramp_time_min', 'loop_speed_interval_sec', 'loop_range_interval_min_s', 'loop_range_interval_max_s', 'loop_range_transition_time_s', 'slowest_loop_speed']:
             live_params_update[k] = loop_eff[k]
 
-        master_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in ['left_amplitude', 'right_amplitude', 'ambient_amplitude', 'ambient_panning_link_enabled', 'stereo_width', 'panning_law', 'pan_offset', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol', 'spatial_phase_offset']}
+        master_base = {k: self.config.live_params.get(k, DEFAULT_SETTINGS[k]) for k in ['left_amplitude', 'right_amplitude', 'ambient_amplitude', 'ambient_panning_link_enabled', 'stereo_width', 'panning_law', 'pan_offset', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol', 'spatial_phase_offset', 'channel_phase_blend']}
         master_base['ambient_panning_link_enabled'] = 1.0 if master_base.get('ambient_panning_link_enabled') else 0.0
         master_eff, _ = apply_modulations_to_parameters(ctx, "Master", master_base, activation_levels, unified_sources, mod_matrix_override=effective_matrix)
         master_eff['ambient_panning_link_enabled'] = master_eff['ambient_panning_link_enabled'] > 0.5
@@ -644,6 +644,26 @@ class ModulationEngine:
                     final_eff_params = self._apply_lfo_to_params(
                         gen_wrapper, mod_params, num_samples_hint
                     )
+
+                    # --- Channel Blend ---
+                    # Blends the two output channels out of phase. 1.0 = fully
+                    # anti-phase (they cancel in the shared return, so overall
+                    # strength drops); 0.0 = in-phase (normal). The wave's own
+                    # phase_offset (0.0-1.0 of a full turn) is added on top.
+                    # Right is offset relative to the Left reference channel.
+                    # Slew rate is shared by all waves.
+                    channel_blend = (
+                        float(np.clip(live_params.get('channel_phase_blend', 0.0), 0.0, 1.0))
+                        if ch_key == 'right' else 0.0
+                    )
+                    wave_phase = float(final_eff_params.get('phase_offset', 0.0))
+                    total_turns = wave_phase + channel_blend * 0.5
+                    final_eff_params['phase_offset_rad'] = total_turns * (2.0 * np.pi)
+                    final_eff_params['phase_slew_ms'] = live_params.get(
+                        'channel_phase_slew_ms',
+                        DEFAULT_SETTINGS['channel_phase_slew_ms']
+                    )
+                    # --- End Channel Blend ---
 
                     # --- Spatial Mapping LUT Lookup ---
                     if lut_key in self.app_context.spatial_mapping_luts:

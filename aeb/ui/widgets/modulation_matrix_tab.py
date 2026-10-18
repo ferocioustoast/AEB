@@ -219,6 +219,7 @@ class ModulationMatrixTab(QWidget):
         
         if wave_type in['sine', 'square', 'sawtooth', 'triangle', 'additive']:
             params.append('shape_morph')
+            params.append('phase_offset')
 
         if wave_type == 'additive':
             params.extend(['spectral_tilt', 'odd_even_bias'])
@@ -242,7 +243,8 @@ class ModulationMatrixTab(QWidget):
 
         elif wave_type == 'pulsetrain':
             params.extend([
-                'pulse_rate_hz', 'pulse_width_ms', 'pulse_jitter', 'pulse_omit'
+                'pulse_rate_hz', 'pulse_width_ms', 'pulse_jitter', 'pulse_omit',
+                'phase_offset'
             ])
 
         return sorted(params)
@@ -275,7 +277,8 @@ class ModulationMatrixTab(QWidget):
             new_items = ['left_amplitude', 'right_amplitude', 'ambient_amplitude',
                          'ambient_panning_link_enabled', 'stereo_width', 'pan_offset',
                          'panning_law', 'left_min_vol', 'left_max_vol', 'right_min_vol', 'right_max_vol',
-                         'spatial_phase_offset', 'safety_attack_time']
+                         'spatial_phase_offset', 'safety_attack_time',
+                         'channel_phase_blend']
         elif category_name == 'Ramping':
             new_items = ['ramp_up_enabled', 'ramp_up_time', 'ramp_down_enabled', 'ramp_down_time',
                          'idle_time_before_ramp_down', 'long_idle_enabled',

@@ -35,11 +35,15 @@ class AudioGeneralTab(QWidget):
         self.stereo_width_save_timer = QTimer(self)
         self.stereo_width_save_timer.setSingleShot(True)
         self.stereo_width_save_timer.setInterval(300)
+        self.phase_offset_save_timer = QTimer(self)
+        self.phase_offset_save_timer.setSingleShot(True)
+        self.phase_offset_save_timer.setInterval(300)
         main_layout = QGridLayout(self)
         current_row = 0
         current_row = self._create_device_selector_group(main_layout, current_row)
         current_row = self._create_master_volume_group(main_layout, current_row)
         current_row = self._create_panning_group(main_layout, current_row)
+        current_row = self._create_phase_group(main_layout, current_row)
         current_row = self._create_behavior_checkboxes(main_layout, current_row)
         current_row = self._create_sounddevice_group(main_layout, current_row)
         main_layout.setRowStretch(current_row, 1)
@@ -75,6 +79,11 @@ class AudioGeneralTab(QWidget):
             width_val = int(cfg.get('stereo_width', DEFAULT_SETTINGS['stereo_width']) * 100)
             self.stereo_width_slider.setValue(width_val)
             self.stereo_width_label.setText(f"{width_val}%")
+
+            blend_val = float(cfg.get('channel_phase_blend', DEFAULT_SETTINGS['channel_phase_blend']))
+            self.phase_offset_slider.setValue(int(round(blend_val * 100)))
+            self.phase_offset_label.setText(f"{blend_val:.2f}")
+            self.phase_slew_spinbox.setValue(cfg.get('channel_phase_slew_ms', DEFAULT_SETTINGS['channel_phase_slew_ms']))
             self.discrete_channels_checkbox.setChecked(cfg.get('use_discrete_channels', DEFAULT_SETTINGS['use_discrete_channels']))
             self.audio_buffer_size_spinbox.setValue(cfg.get('audio_buffer_size', DEFAULT_SETTINGS['audio_buffer_size']))
             self.audio_latency_combo.setCurrentText(str(cfg.get('audio_latency', DEFAULT_SETTINGS['audio_latency'])))
@@ -133,6 +142,10 @@ class AudioGeneralTab(QWidget):
         self.edit_custom_curve_btn.clicked.connect(self._launch_mapper_dialog)
         self.stereo_width_slider.valueChanged.connect(self._on_stereo_width_slider_moved)
         self.stereo_width_save_timer.timeout.connect(self._save_stereo_width_setting)
+        self.phase_offset_slider.valueChanged.connect(self._on_phase_offset_slider_moved)
+        self.phase_offset_save_timer.timeout.connect(self._save_phase_offset_setting)
+        self.phase_slew_spinbox.valueChanged.connect(
+            lambda val: self.main_window.update_setting_value('channel_phase_slew_ms', val))
         self.discrete_channels_checkbox.stateChanged.connect(
             lambda state: self.main_window.update_setting_value('use_discrete_channels', state == 2))
         self.audio_buffer_size_spinbox.valueChanged.connect(
@@ -275,6 +288,36 @@ class AudioGeneralTab(QWidget):
         layout.addLayout(width_layout, row, 1, 1, 2)
         return row + 1
 
+    def _create_phase_group(self, layout: QGridLayout, row: int) -> int:
+        """Creates widgets for the Channel Blend control."""
+        phase_layout = QHBoxLayout()
+        self.phase_offset_slider = QSlider(Qt.Horizontal, minimum=0, maximum=100)
+        self.phase_offset_slider.setToolTip(
+            "Channel Blend: how far the Right channel is shifted out of phase with the Left.\n"
+            "0.00 = in-phase (both loops push together, full strength).\n"
+            "1.00 = fully anti-phase (they cancel in the shared return, so overall strength drops).\n"
+            "Sweeping it makes the sensation swell and fade. Drive it from Speed for a\n"
+            "'clamp down as you move' feel. Changes glide smoothly (click-free)."
+        )
+        phase_layout.addWidget(self.phase_offset_slider)
+        self.phase_offset_label = QLabel("0.00")
+        self.phase_offset_label.setMinimumWidth(40)
+        phase_layout.addWidget(self.phase_offset_label)
+        layout.addWidget(QLabel("Channel Blend (R\u2194L):"), row, 0)
+        layout.addLayout(phase_layout, row, 1, 1, 2)
+        row += 1
+
+        self.phase_slew_spinbox = QDoubleSpinBox(decimals=0, minimum=1, maximum=2000, singleStep=5)
+        self.phase_slew_spinbox.setSuffix(" ms")
+        self.phase_slew_spinbox.setToolTip(
+            "How long a Channel Blend change takes to glide to its new value.\n"
+            "Lower = snappier; higher = gentler, smoother swell/fade.\n"
+            "50 ms is a good default."
+        )
+        layout.addWidget(QLabel("Channel Blend Speed:"), row, 0)
+        layout.addWidget(self.phase_slew_spinbox, row, 1, 1, 2)
+        return row + 1
+
     def _create_behavior_checkboxes(self, layout: QGridLayout, row: int) -> int:
         """Creates the group of general behavior checkboxes."""
         self.discrete_channels_checkbox = QCheckBox("Use Discrete Channels")
@@ -336,6 +379,16 @@ class AudioGeneralTab(QWidget):
         """Saves the final stereo width value after the debounce timer."""
         value = self.stereo_width_slider.value() / 100.0
         self.main_window.update_setting_value('stereo_width', value)
+
+    def _on_phase_offset_slider_moved(self, value: int):
+        """Handles the Channel Blend slider's movement with debouncing."""
+        self.phase_offset_label.setText(f"{value / 100.0:.2f}")
+        self.phase_offset_save_timer.start()
+
+    def _save_phase_offset_setting(self):
+        """Saves the final Channel Blend value after the debounce timer."""
+        self.main_window.update_setting_value(
+            'channel_phase_blend', self.phase_offset_slider.value() / 100.0)
 
     def _on_panning_law_changed(self, law_selection: str):
         """Handles logic when the user changes the panning law dropdown."""

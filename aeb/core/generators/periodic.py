@@ -48,6 +48,11 @@ class PeriodicGenerator(AudioGeneratorBase):
             phases += jitter_offset
         # ---------------------------------------------
 
+        # --- Inter-channel / per-wave carrier phase offset ---
+        if isinstance(self._phase_trim_block, np.ndarray):
+            phases += self._phase_trim_block
+        # ----------------------------------------------------
+
         block = self.output_buffer[:num_samples]
         norm_phase_for_duty = (phases / (2 * np.pi)) % 1.0
 
