@@ -96,6 +96,7 @@ class StandardInspector(InspectorPanelBase):
             self.edit_spatial_map_btn.setEnabled(is_spatial_enabled)
             self.pan_slider.setEnabled(not is_spatial_enabled)
             self.pan_spinbox.setEnabled(not is_spatial_enabled)
+            self._populate_position_maps(conf)
 
             self.atk_spinbox.setValue(conf.get('ads_attack_time', 0.0))
             self.dec_spinbox.setValue(conf.get('ads_decay_time', 0.0))
@@ -249,22 +250,7 @@ class StandardInspector(InspectorPanelBase):
 
     def _create_spatial_mapping_group(self) -> QGroupBox:
         """Creates the UI for the Spatial Mapping feature."""
-        group = QGroupBox("Spatial Mapping / Positional Override")
-        layout = QVBoxLayout(group)
-        
-        self.spatial_mapping_checkbox = QCheckBox("Enable Spatial Mapping")
-        self.spatial_mapping_checkbox.setToolTip(
-            "Enables Zonal Layer mode. Takes control of volume from the global panner "
-            "and uses the defined curves instead."
-        )
-        
-        self.edit_spatial_map_btn = QPushButton("Edit Spatial Map...")
-        self.edit_spatial_map_btn.setToolTip("Open the curve editor to define positional volume zones.")
-        self.edit_spatial_map_btn.setEnabled(False)
-        
-        layout.addWidget(self.spatial_mapping_checkbox)
-        layout.addWidget(self.edit_spatial_map_btn)
-        return group
+        return self._create_spatial_group()
 
     def _create_env_group(self) -> QGroupBox:
         group = QGroupBox("Envelope (ADSR)")

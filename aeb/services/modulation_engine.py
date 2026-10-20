@@ -669,23 +669,68 @@ class ModulationEngine:
                     if lut_key in self.app_context.spatial_mapping_luts:
                         luts = self.app_context.spatial_mapping_luts[lut_key]
                         motion_val = self.app_context.last_processed_motor_value
-                        
-                        # === NEW: Spatial Phase Displacement ===
+
+                        # === Spatial Phase Displacement ===
                         # Allows L and R lookups to diverge based on speed/settings
                         phase_offset = live_params.get('spatial_phase_offset', 0.0)
-                        
+
                         # Calculate divergent positions
                         # Offset adds to Right, subtracts from Left (Shear effect)
-                        # We assume motion_val is 0.0-1.0. 
+                        # We assume motion_val is 0.0-1.0.
                         pos_L = np.clip(motion_val - (phase_offset * 0.5), 0.0, 1.0)
                         pos_R = np.clip(motion_val + (phase_offset * 0.5), 0.0, 1.0)
-                        
+
                         lut_len = LUT_RESOLUTION - 1
                         index_L = int(pos_L * lut_len)
                         index_R = int(pos_R * lut_len)
-                        
-                        final_eff_params['spatial_gain_l'] = luts['lut_left'][index_L]
-                        final_eff_params['spatial_gain_r'] = luts['lut_right'][index_R]
+                        index_center = int(np.clip(motion_val, 0.0, 1.0) * lut_len)
+
+                        if 'lut_left' in luts:
+                            final_eff_params['spatial_gain_l'] = luts['lut_left'][index_L]
+                            final_eff_params['spatial_gain_r'] = luts['lut_right'][index_R]
+
+                        # --- Position-locked carrier frequency ---
+                        # The curve defines an absolute Hz target. Dividing by
+                        # the wave's configured base frequency yields a ratio so
+                        # matrix/LFO modulation still composes multiplicatively.
+                        if 'lut_freq_hz' in luts:
+                            base_freq = float(gen_wrapper.config.get('frequency', 440.0))
+                            if gen_wrapper.config.get('type') == 'sampler':
+                                base_freq = float(
+                                    gen_wrapper.config.get('sampler_frequency', 0.0))
+                            target_freq = luts['lut_freq_hz'][index_center]
+                            if base_freq > 0.01:
+                                final_eff_params['frequency'] = np.clip(
+                                    final_eff_params['frequency']
+                                    * (target_freq / base_freq),
+                                    20.0, 20000.0
+                                )
+                            else:
+                                final_eff_params['frequency'] = np.clip(
+                                    target_freq, 20.0, 20000.0)
+
+                        # --- Position-locked filter cutoff ---
+                        if 'lut_filter_hz' in luts:
+                            base_cutoff = float(gen_wrapper.config.get(
+                                'filter_cutoff_frequency', 1000.0))
+                            target_cutoff = luts['lut_filter_hz'][index_center]
+                            if base_cutoff > 0.01:
+                                final_eff_params['filter_cutoff_frequency'] = np.clip(
+                                    final_eff_params['filter_cutoff_frequency']
+                                    * (target_cutoff / base_cutoff),
+                                    20.0, 20000.0
+                                )
+                            else:
+                                final_eff_params['filter_cutoff_frequency'] = np.clip(
+                                    target_cutoff, 20.0, 20000.0)
+
+                        # --- Position-locked shape morph (bipolar offset) ---
+                        if 'lut_morph' in luts:
+                            final_eff_params['shape_morph'] = np.clip(
+                                final_eff_params['shape_morph']
+                                + luts['lut_morph'][index_center],
+                                -1.0, 1.0
+                            )
                     # --- End Spatial Mapping ---
 
                     final_params[param_key] = final_eff_params

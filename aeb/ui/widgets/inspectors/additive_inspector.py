@@ -93,6 +93,7 @@ class AdditiveInspector(InspectorPanelBase):
             self.edit_spatial_map_btn.setEnabled(is_spatial_enabled)
             self.pan_slider.setEnabled(not is_spatial_enabled)
             self.pan_spinbox.setEnabled(not is_spatial_enabled)
+            self._populate_position_maps(conf)
 
             harmonics = conf.get('harmonics', [1.0] + [0.0] * 15)
             for i, h_val in enumerate(harmonics):
@@ -295,14 +296,7 @@ class AdditiveInspector(InspectorPanelBase):
 
     def _create_spatial_mapping_group(self) -> QGroupBox:
         """Creates the UI for the Spatial Mapping feature."""
-        group = QGroupBox("Spatial Mapping / Positional Override")
-        layout = QVBoxLayout(group)
-        self.spatial_mapping_checkbox = QCheckBox("Enable Spatial Mapping")
-        self.edit_spatial_map_btn = QPushButton("Edit Spatial Map...")
-        self.edit_spatial_map_btn.setEnabled(False)
-        layout.addWidget(self.spatial_mapping_checkbox)
-        layout.addWidget(self.edit_spatial_map_btn)
-        return group
+        return self._create_spatial_group()
 
     def _create_harmonics_group(self) -> QGroupBox:
         group = QGroupBox("Harmonic Amplitudes (H1-H16)")

@@ -145,10 +145,65 @@ def update_audio_generators(app_context: 'AppContext'):
     )
 
 
+# Engine-side clamping ranges for position-locked value maps. These mirror
+# the per-wave parameter clamps in ConfigurationManager._validate_wave.
+SPATIAL_VALUE_MAP_RANGES = {
+    'spatial_frequency_map': (20.0, 20000.0),
+    'spatial_filter_map': (20.0, 20000.0),
+    'spatial_morph_map': (-1.0, 1.0),
+}
+
+# LUT keys stored for each position-locked value map.
+SPATIAL_VALUE_MAP_LUT_KEYS = {
+    'spatial_frequency_map': 'lut_freq_hz',
+    'spatial_filter_map': 'lut_filter_hz',
+    'spatial_morph_map': 'lut_morph',
+}
+
+
+def _bake_spatial_value_lut(
+        app_context: 'AppContext', key: str, map_config, lut_key: str,
+        value_range: tuple, x_pos: np.ndarray) -> Optional[np.ndarray]:
+    """
+    Bakes a position-locked value curve into a fixed-resolution LUT.
+
+    Returns None if the map is disabled or invalid.
+    """
+    if not (isinstance(map_config, dict) and map_config.get('enabled', False)):
+        return None
+
+    try:
+        curve = sorted(map_config.get('curve', []))
+        if not curve:
+            raise ValueError("Curve is missing or empty.")
+
+        xp, fp = np.array(curve, dtype=float).T
+
+        # np.interp requires strictly increasing x; collapse duplicate
+        # positions (the last value at a shared position wins).
+        keep = np.ones(len(xp), dtype=bool)
+        keep[:-1] = np.diff(xp) > 1e-9
+        xp = xp[keep]
+        fp = fp[keep]
+        if len(xp) < 2:
+            raise ValueError("Curve needs at least two distinct positions.")
+
+        lower, upper = value_range
+        return np.interp(x_pos, xp, np.clip(fp, lower, upper))
+    except Exception as e:
+        app_context.signals.log_message.emit(
+            f"Error generating {lut_key} for {key}: {e}")
+        return None
+
+
 def _update_spatial_mapping_lut_for_generator(
         app_context: 'AppContext', channel: str, index: int, config: dict):
     """
-    Calculates and stores a Spatial Mapping LUT for a generator if needed.
+    Calculates and stores the spatial LUTs for a generator if needed.
+
+    This includes the legacy per-channel volume mapping curves (Zonal Layer
+    mode) and the optional position-locked value maps (frequency, filter
+    cutoff, and shape morph). Any enabled map is stored under one entry.
 
     Args:
         app_context: The central application context.
@@ -157,37 +212,43 @@ def _update_spatial_mapping_lut_for_generator(
         config: The configuration dictionary for the generator.
     """
     key = f"{channel}.{index}"
+    x_pos = np.linspace(0, 1, LUT_RESOLUTION)
+    luts: dict = {}
+
+    # --- Per-channel volume curves (Zonal Layer mode) ---
     spatial_map = config.get('spatial_mapping')
     is_enabled = isinstance(spatial_map, dict) and spatial_map.get('enabled', False)
 
-    if not is_enabled:
-        if key in app_context.spatial_mapping_luts:
-            del app_context.spatial_mapping_luts[key]
-        return
+    if is_enabled:
+        try:
+            left_curve = sorted(spatial_map.get('left_curve', []))
+            right_curve = sorted(spatial_map.get('right_curve', []))
 
-    try:
-        left_curve = sorted(spatial_map.get('left_curve', []))
-        right_curve = sorted(spatial_map.get('right_curve', []))
+            if not (left_curve and right_curve):
+                raise ValueError("Curves are missing or empty.")
 
-        if not (left_curve and right_curve):
-            raise ValueError("Curves are missing or empty.")
+            xp_l, fp_l = np.array(left_curve).T
+            xp_r, fp_r = np.array(right_curve).T
 
-        x_pos = np.linspace(0, 1, LUT_RESOLUTION)
-        xp_l, fp_l = np.array(left_curve).T
-        xp_r, fp_r = np.array(right_curve).T
+            luts['lut_left'] = np.interp(x_pos, xp_l, fp_l)
+            luts['lut_right'] = np.interp(x_pos, xp_r, fp_r)
+        except Exception as e:
+            app_context.signals.log_message.emit(
+                f"Error generating Spatial Map LUT for {key}: {e}")
 
-        lut_left = np.interp(x_pos, xp_l, fp_l)
-        lut_right = np.interp(x_pos, xp_r, fp_r)
+    # --- Position-locked value maps (frequency / filter / morph) ---
+    for map_key, lut_key in SPATIAL_VALUE_MAP_LUT_KEYS.items():
+        lut = _bake_spatial_value_lut(
+            app_context, key, config.get(map_key), lut_key,
+            SPATIAL_VALUE_MAP_RANGES[map_key], x_pos
+        )
+        if lut is not None:
+            luts[lut_key] = lut
 
-        app_context.spatial_mapping_luts[key] = {
-            'lut_left': lut_left,
-            'lut_right': lut_right,
-        }
-    except Exception as e:
-        app_context.signals.log_message.emit(
-            f"Error generating Spatial Map LUT for {key}: {e}")
-        if key in app_context.spatial_mapping_luts:
-            del app_context.spatial_mapping_luts[key]
+    if luts:
+        app_context.spatial_mapping_luts[key] = luts
+    elif key in app_context.spatial_mapping_luts:
+        del app_context.spatial_mapping_luts[key]
 
 
 def _stop_existing_audio_stream(app_context: 'AppContext'):

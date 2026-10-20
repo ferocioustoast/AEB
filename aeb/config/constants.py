@@ -117,6 +117,9 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'pan': 0.0,
     'phase_offset': 0.0,
     'spatial_mapping': None,
+    'spatial_frequency_map': None,
+    'spatial_filter_map': None,
+    'spatial_morph_map': None,
 }
 
 # --- Channel-Specific Default Waves ---

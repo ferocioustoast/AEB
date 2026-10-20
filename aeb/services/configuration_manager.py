@@ -520,8 +520,62 @@ class ConfigurationManager:
                 validated['pan'] = -1.0
             elif channel_key == 'right':
                 validated['pan'] = 1.0
-        
+
+        # --- Position-Locked Value Maps (frequency / filter / morph) ---
+        for map_key in ('spatial_frequency_map', 'spatial_filter_map',
+                        'spatial_morph_map'):
+            validated[map_key] = self._validate_spatial_value_map(
+                validated.get(map_key))
+
         return validated
+
+    @staticmethod
+    def _validate_spatial_value_map(map_config: Optional[dict]) -> Optional[dict]:
+        """
+        Sanitizes a position-locked value map ({'enabled', 'curve'}).
+
+        Returns None when the map is malformed so the engine simply ignores it.
+        """
+        if not isinstance(map_config, dict):
+            return None
+
+        curve = map_config.get('curve')
+        if not isinstance(curve, list) or len(curve) < 2:
+            return None
+
+        cleaned = []
+        try:
+            for point in curve:
+                if not isinstance(point, (list, tuple)) or len(point) != 2:
+                    continue
+                x = np.clip(float(point[0]), 0.0, 1.0)
+                y = float(point[1])
+                cleaned.append([float(x), y])
+        except (ValueError, TypeError):
+            return None
+
+        if len(cleaned) < 2:
+            return None
+
+        cleaned.sort(key=lambda p: p[0])
+
+        # Collapse duplicate positions (np.interp requires increasing x).
+        deduped = []
+        for point in cleaned:
+            if deduped and abs(point[0] - deduped[-1][0]) < 1e-9:
+                deduped[-1] = point
+            else:
+                deduped.append(point)
+        if len(deduped) < 2:
+            return None
+
+        deduped[0][0] = 0.0
+        deduped[-1][0] = 1.0
+
+        return {
+            'enabled': bool(map_config.get('enabled', False)),
+            'curve': deduped,
+        }
 
     def _deep_merge_dicts(self, base: dict, new: dict) -> dict:
         """Recursively merges dict `new` into dict `base`."""

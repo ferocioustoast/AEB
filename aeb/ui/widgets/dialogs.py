@@ -420,6 +420,41 @@ class SpatialMapperDialog(QDialog):
                         return
 
 
+class _CurveValueAxis(pg.AxisItem):
+    """
+    A left axis for curve editors that maps normalized 0..1 plot coordinates
+    back to real values (linear or logarithmic).
+
+    The plot itself always uses 0..1 so ROI handle math stays simple and
+    pyqtgraph's log-mode coordinate quirks are avoided.
+    """
+
+    def __init__(self, y_min: float, y_max: float, log_y: bool, **kwargs):
+        super().__init__('left', **kwargs)
+        self._y_min = float(y_min)
+        self._y_max = float(y_max)
+        self._log_y = bool(log_y) and self._y_min > 0.0
+
+    def _to_value(self, norm: float) -> float:
+        norm = min(max(float(norm), 0.0), 1.0)
+        if self._log_y:
+            return self._y_min * ((self._y_max / self._y_min) ** norm)
+        return self._y_min + norm * (self._y_max - self._y_min)
+
+    @staticmethod
+    def _format_value(value: float) -> str:
+        if abs(value) >= 1000.0:
+            return f"{value / 1000.0:.1f}k"
+        if abs(value) >= 100.0:
+            return f"{value:.0f}"
+        if abs(value) >= 10.0:
+            return f"{value:.1f}"
+        return f"{value:.2f}"
+
+    def tickStrings(self, values, scale, spacing):
+        return [self._format_value(self._to_value(v)) for v in values]
+
+
 class GenericCurveEditorDialog(QDialog):
     """
     A generic modal dialog for graphically editing a single data curve.
@@ -430,6 +465,9 @@ class GenericCurveEditorDialog(QDialog):
                  title: str = "Curve Editor",
                  x_label: str = "X Axis",
                  y_label: str = "Y Axis",
+                 y_min: float = 0.0,
+                 y_max: float = 1.0,
+                 log_y: bool = False,
                  parent=None):
         """
         Initializes the GenericCurveEditorDialog.
@@ -439,11 +477,19 @@ class GenericCurveEditorDialog(QDialog):
             title: Window title.
             x_label: Label for the X axis.
             y_label: Label for the Y axis.
+            y_min: Minimum Y value (curve values are clipped to this).
+            y_max: Maximum Y value (curve values are clipped to this).
+            log_y: If True, the Y axis is displayed and interpolated on a
+                   logarithmic scale (requires y_min > 0).
             parent: The parent widget.
         """
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumSize(800, 600)
+
+        self.y_min = float(y_min)
+        self.y_max = float(y_max)
+        self.log_y = bool(log_y) and self.y_min > 0.0 and self.y_max > self.y_min
 
         self.working_data = copy.deepcopy(initial_mapping_data)
         if self.working_data is None or not isinstance(self.working_data, list):
@@ -468,7 +514,12 @@ class GenericCurveEditorDialog(QDialog):
         """Creates the mapper plot and its associated controls."""
         mapper_group = QWidget()
         layout = QHBoxLayout(mapper_group)
-        self.mapper_plot = pg.PlotWidget()
+
+        # The plot always works in normalized 0..1 space; the custom axis
+        # converts those coordinates back to real values for display.
+        value_axis = _CurveValueAxis(
+            self.y_min, self.y_max, self.log_y)
+        self.mapper_plot = pg.PlotWidget(axisItems={'left': value_axis})
         plot_item = self.mapper_plot.getPlotItem()
         plot_item.setLimits(xMin=-0.01, xMax=1.01, yMin=-0.01, yMax=1.01)
         plot_item.setLabel('bottom', x_label)
@@ -501,20 +552,47 @@ class GenericCurveEditorDialog(QDialog):
         self._update_plot_from_data()
 
     def _generate_preset_data(self, preset_name: str) -> List:
-        """Creates a list of points for a preset curve."""
-        if preset_name == 'flat_100': return [[0.0, 1.0], [1.0, 1.0]]
-        if preset_name == 'flat_50': return [[0.0, 0.5], [1.0, 0.5]]
-        if preset_name == 'ramp_up': return [[0.0, 0.0], [1.0, 1.0]]
-        if preset_name == 'ramp_down': return [[0.0, 1.0], [1.0, 0.0]]
-        if preset_name == 'bell': return [[0.0, 0.0], [0.5, 1.0], [1.0, 0.0]]
-        if preset_name == 'dip': return [[0.0, 1.0], [0.5, 0.0], [1.0, 1.0]]
-        return [[0.0, 0.5], [1.0, 0.5]]
+        """Creates a list of points for a preset curve.
+
+        Presets are defined in normalized 0..1 space and then mapped onto the
+        dialog's Y range (linearly, or logarithmically when log_y is enabled).
+        """
+        if preset_name == 'flat_100': data = [[0.0, 1.0], [1.0, 1.0]]
+        elif preset_name == 'flat_50': data = [[0.0, 0.5], [1.0, 0.5]]
+        elif preset_name == 'ramp_up': data = [[0.0, 0.0], [1.0, 1.0]]
+        elif preset_name == 'ramp_down': data = [[0.0, 1.0], [1.0, 0.0]]
+        elif preset_name == 'bell': data = [[0.0, 0.0], [0.5, 1.0], [1.0, 0.0]]
+        elif preset_name == 'dip': data = [[0.0, 1.0], [0.5, 0.0], [1.0, 1.0]]
+        else: data = [[0.0, 0.5], [1.0, 0.5]]
+
+        return [[x, self._denormalize_y(v)] for x, v in data]
+
+    def _denormalize_y(self, value: float) -> float:
+        """Maps a normalized 0..1 value onto the dialog's Y range."""
+        value = float(np.clip(value, 0.0, 1.0))
+        if self.log_y:
+            return self.y_min * ((self.y_max / self.y_min) ** value)
+        return self.y_min + value * (self.y_max - self.y_min)
+
+    def _normalize_y(self, value: float) -> float:
+        """Maps a Y value back into normalized 0..1 space."""
+        if self.y_max <= self.y_min:
+            return 0.0
+        if self.log_y and value > 0.0:
+            ratio = (self.y_max / self.y_min)
+            norm = np.log(value / self.y_min) / np.log(ratio)
+        else:
+            norm = (value - self.y_min) / (self.y_max - self.y_min)
+        return float(np.clip(norm, 0.0, 1.0))
 
     def _update_plot_from_data(self):
         """Updates the pyqtgraph plot items from the current working_data."""
         if self.working_data:
             with pg.SignalBlock(self.curve_roi.sigRegionChanged, self._on_roi_changed):
-                points = [QPointF(p[0], p[1]) for p in self.working_data]
+                points = [
+                    QPointF(p[0], self._normalize_y(p[1]))
+                    for p in self.working_data
+                ]
                 self.curve_roi.setPoints(points)
                 self._constrain_roi_handles(self.curve_roi)
 
@@ -527,15 +605,22 @@ class GenericCurveEditorDialog(QDialog):
 
     def _on_roi_changed(self, roi: pg.PolyLineROI):
         """Reads ROI data, sorts it, and updates working data."""
-        points = [[handle.pos().x(), handle.pos().y()] for handle in roi.getHandles()]
+        points = [[handle.pos().x(), handle.pos().y()]
+                  for handle in roi.getHandles()]
         points.sort(key=lambda p: p[0])
-        corrected = [[np.clip(p[0], 0.0, 1.0), np.clip(p[1], 0.0, 1.0)] for p in points]
+        corrected = [
+            [np.clip(p[0], 0.0, 1.0),
+             self._denormalize_y(float(np.clip(p[1], 0.0, 1.0)))]
+            for p in points
+        ]
         if corrected:
             corrected[0][0] = 0.0
             corrected[-1][0] = 1.0
         self.working_data = corrected
         with pg.SignalBlock(roi.sigRegionChanged, self._on_roi_changed):
-            qpoints = [QPointF(p[0], p[1]) for p in corrected]
+            qpoints = [
+                QPointF(p[0], self._normalize_y(p[1])) for p in corrected
+            ]
             if [h.pos() for h in roi.getHandles()] != qpoints:
                 roi.setPoints(qpoints)
                 self._constrain_roi_handles(roi)
@@ -546,8 +631,10 @@ class GenericCurveEditorDialog(QDialog):
             mouse_point = self.mapper_plot.getPlotItem().vb.mapSceneToView(event.scenePos())
             new_pt, index = self.curve_roi.findNearestSegment(mouse_point)
             if new_pt is not None and index is not None:
-                dist = np.linalg.norm(np.array([new_pt.x(), new_pt.y()]) - np.array([mouse_point.x(), mouse_point.y()]))
-                if dist < 0.05:
+                # Both points are already in normalized 0..1 plot space.
+                dx = new_pt.x() - mouse_point.x()
+                dy = new_pt.y() - mouse_point.y()
+                if np.linalg.norm([dx, dy]) < 0.05:
                     self.curve_roi.addHandle(new_pt, index=index)
                     self._constrain_roi_handles(self.curve_roi)
                     self._on_roi_changed(self.curve_roi)
