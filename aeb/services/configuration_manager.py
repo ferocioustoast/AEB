@@ -495,6 +495,8 @@ class ConfigurationManager:
             'filter_cutoff_frequency': (20.0, 20000.0),
             'filter_resonance_q': (0.1, 30.0),
             'filter_formant_vowel': (0.0, 1.0),
+            'filter_mix': (0.0, 1.0),
+            'filter_delay_ms': (0.0, 50.0),
             'sampler_frequency': (0.0, 20000.0),
             'sampler_original_pitch': (1.0, 20000.0),
             'sampler_loop_start': (0.0, 1.0), 'sampler_loop_end': (0.0, 1.0),
@@ -520,6 +522,10 @@ class ConfigurationManager:
                 validated['pan'] = -1.0
             elif channel_key == 'right':
                 validated['pan'] = 1.0
+
+        # --- Comb Filter Toggle Coercion ---
+        validated['comb_feedforward'] = bool(
+            validated.get('comb_feedforward', False))
 
         # --- Position-Locked Value Maps (frequency / filter / morph) ---
         for map_key in ('spatial_frequency_map', 'spatial_filter_map',

@@ -99,6 +99,9 @@ DEFAULT_WAVE_SETTINGS: dict = {
     'filter_cutoff_frequency': 1000.0,
     'filter_resonance_q': 0.707,
     'filter_formant_vowel': 0.0,  # 0.0 (U) to 1.0 (I)
+    'filter_mix': 1.0,            # Wet/dry blend for all filter types (0=dry, 1=wet)
+    'filter_delay_ms': 5.0,       # Comb delay override in ms (0 = derive from cutoff)
+    'comb_feedforward': False,    # False = feedback comb, True = feed-forward comb
     'muted': False,
     'soloed': False,
     'harmonics': [1.0] + [0.0] * 15,

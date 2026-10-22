@@ -606,6 +606,10 @@ class ModulationEngine:
             mod = 1.0 + lfo_signal * depth
             eff_params['amplitude'] = np.maximum(
                 0.0, eff_params['amplitude'] * mod)
+        elif target == 'filter_cutoff' and cfg.get('filter_enabled', False):
+            mod = 1.0 + lfo_signal * depth
+            eff_params['filter_cutoff_frequency'] = np.clip(
+                eff_params['filter_cutoff_frequency'] * mod, 20.0, 20000.0)
         elif target == 'duty_cycle' and not is_noise and cfg.get('type') == 'square':
             mod = params['duty_cycle'] + lfo_signal * depth
             eff_params['duty_cycle'] = np.clip(mod, 0.01, 0.99)

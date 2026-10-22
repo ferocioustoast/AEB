@@ -120,6 +120,9 @@ class AdditiveInspector(InspectorPanelBase):
             self.filter_type_combo.setCurrentText(f_type)
             self.filter_freq_spinbox.setValue(conf.get('filter_cutoff_frequency', 1000.0))
             self.filter_q_spinbox.setValue(conf.get('filter_resonance_q', 0.707))
+            self.filter_mix_spinbox.setValue(conf.get('filter_mix', 1.0))
+            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 5.0))
+            self.comb_feedforward_checkbox.setChecked(conf.get('comb_feedforward', False))
             
             vowel_val = conf.get('filter_formant_vowel', 0.0)
             self.formant_slider.setValue(int(vowel_val * 100))
@@ -352,7 +355,7 @@ class AdditiveInspector(InspectorPanelBase):
         main_layout.addWidget(self.lfo_enabled_checkbox)
         form = QFormLayout()
         self.lfo_target_combo = QComboBox()
-        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan', 'phase_jitter_amount'])
+        self.lfo_target_combo.addItems(['amplitude', 'frequency', 'pan', 'phase_jitter_amount', 'filter_cutoff'])
         form.addRow("Target:", self.lfo_target_combo)
         self.lfo_shape_combo = QComboBox()
         self.lfo_shape_combo.addItems(
@@ -375,7 +378,7 @@ class AdditiveInspector(InspectorPanelBase):
         form = QFormLayout()
         self.filter_type_combo = QComboBox()
         self.filter_type_combo.addItems(
-            ['lowpass', 'highpass', 'bandpass', 'notch', 'formant'])
+            ['lowpass', 'highpass', 'bandpass', 'notch', 'formant', 'comb'])
         form.addRow("Type:", self.filter_type_combo)
         
         # Formant Vowel Morph
@@ -400,19 +403,45 @@ class AdditiveInspector(InspectorPanelBase):
         self.filter_q_label = QLabel("Resonance (Q):")
         form.addRow(self.filter_q_label, self.filter_q_spinbox)
         
+        self.filter_mix_spinbox = QDoubleSpinBox(
+            decimals=3, minimum=0.0, maximum=1.0, singleStep=0.05)
+        self.filter_mix_spinbox.setToolTip("Wet/dry blend. 1.0 = fully filtered, 0.0 = dry.")
+        self.filter_mix_label = QLabel("Filter Mix:")
+        form.addRow(self.filter_mix_label, self.filter_mix_spinbox)
+        
+        self.filter_delay_spinbox = QDoubleSpinBox(
+            decimals=2, minimum=0.0, maximum=50.0, singleStep=0.5)
+        self.filter_delay_spinbox.setToolTip("Comb delay length in ms. 0 = derive from cutoff.")
+        self.filter_delay_label = QLabel("Comb Delay (ms):")
+        form.addRow(self.filter_delay_label, self.filter_delay_spinbox)
+        
+        self.comb_feedforward_checkbox = QCheckBox("Feed-forward Comb")
+        self.comb_feedforward_checkbox.setToolTip(
+            "Off = feedback comb (resonant). On = feed-forward comb (flanger-like).")
+        form.addRow("", self.comb_feedforward_checkbox)
+        
         main_layout.addLayout(form)
         return group
 
     def _update_filter_ui_state(self, type_text: str):
         is_formant = (type_text == 'formant')
+        is_comb = (type_text == 'comb')
         self.formant_widget.setVisible(is_formant)
         self.formant_label.setVisible(is_formant)
+        self.filter_delay_spinbox.setVisible(is_comb)
+        self.filter_delay_label.setVisible(is_comb)
+        self.comb_feedforward_checkbox.setVisible(is_comb)
         
         if is_formant:
             self.filter_freq_label.setText("Formant Shift (Hz):")
             self.filter_freq_spinbox.setToolTip("Scales the vocal tract size. 1000Hz = Neutral. Lower = Giant, Higher = Chipmunk.")
             self.filter_q_label.setText("Formant Intensity:")
             self.filter_q_spinbox.setToolTip("Sharpness of the vowel peaks.")
+        elif is_comb:
+            self.filter_freq_label.setText("Cutoff Freq (Hz):")
+            self.filter_freq_spinbox.setToolTip("Sets the comb pitch (via delay); overridden by Comb Delay when > 0.")
+            self.filter_q_label.setText("Resonance (Q):")
+            self.filter_q_spinbox.setToolTip("Comb feedback/feed-forward amount (clamped to 0.95 for stability).")
         else:
             self.filter_freq_label.setText("Cutoff Freq (Hz):")
             self.filter_freq_spinbox.setToolTip("The frequency threshold for the filter.")
@@ -441,6 +470,9 @@ class AdditiveInspector(InspectorPanelBase):
             self.filter_type_combo: ('filter_type', 'currentTextChanged'),
             self.filter_freq_spinbox: ('filter_cutoff_frequency', 'valueChanged'),
             self.filter_q_spinbox: ('filter_resonance_q', 'valueChanged'),
+            self.filter_mix_spinbox: ('filter_mix', 'valueChanged'),
+            self.filter_delay_spinbox: ('filter_delay_ms', 'valueChanged'),
+            self.comb_feedforward_checkbox: ('comb_feedforward', 'toggled'),
             self.morph_spinbox: ('shape_morph', 'valueChanged'),
             self.tilt_spinbox: ('spectral_tilt', 'valueChanged'),
             self.bias_spinbox: ('odd_even_bias', 'valueChanged'),
