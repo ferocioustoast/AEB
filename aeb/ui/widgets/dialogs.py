@@ -621,8 +621,15 @@ class GenericCurveEditorDialog(QDialog):
             qpoints = [
                 QPointF(p[0], self._normalize_y(p[1])) for p in corrected
             ]
-            if [h.pos() for h in roi.getHandles()] != qpoints:
-                roi.setPoints(qpoints)
+            handles = roi.getHandles()
+            if [h.pos() for h in handles] != qpoints:
+                # Move existing handles instead of calling setPoints(): this
+                # slot runs while sigRegionChanged is being emitted, and
+                # setPoints() tears down/re-adds handles mid-emission, which
+                # corrupts PySide's signal bookkeeping (spurious "Failed to
+                # disconnect" warnings). Repositioning is equivalent and safe.
+                for handle, qpoint in zip(handles, qpoints):
+                    handle.setPos(qpoint)
                 self._constrain_roi_handles(roi)
 
     def _on_plot_double_clicked(self, event):

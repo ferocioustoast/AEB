@@ -355,6 +355,11 @@ class WaveformsOscilloscopeTab(QWidget):
         self.wave_list.insertItem(index, list_item)
         self.wave_list.setItemWidget(list_item, item_widget)
         self.wave_list.setCurrentRow(index)
+        # Programmatic setCurrentRow does not fire itemClicked, so sync the
+        # inspector target explicitly; otherwise edits would hit the stale
+        # selection left over from before the wave was added.
+        self.main_window.current_selection = (self.main_window.active_channel, index)
+        self.load_wave_data_to_inspector(self.main_window.active_channel, index)
 
     @Slot(str, int)
     def _on_wave_removed(self, channel: str, index: int):
@@ -369,6 +374,12 @@ class WaveformsOscilloscopeTab(QWidget):
         else:
             new_index = max(0, index - 1)
             self.wave_list.setCurrentRow(new_index)
+            # Removing a wave shifts the remaining rows down, so the previous
+            # current_selection now points at a different wave. Re-sync the
+            # inspector target to the new current row (itemClicked won't fire
+            # for a programmatic setCurrentRow).
+            self.main_window.current_selection = (self.main_window.active_channel, new_index)
+            self.load_wave_data_to_inspector(self.main_window.active_channel, new_index)
 
     @Slot(str, int)
     def _on_wave_parameter_updated(self, channel: str, index: int):

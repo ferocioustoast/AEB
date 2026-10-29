@@ -138,7 +138,8 @@ class MainWindow(QMainWindow):
         self.motion_feel_tab = MotionFeelTab(self.app_context, self)
         self.tabs_widget.addTab(self.motion_feel_tab, "Motion Feel")
         self.source_tuning_tab = SourceTuningTab(
-            self.app_context, self, self.controller.lfo_manager)
+            self.app_context, self, self.controller.lfo_manager,
+            self.controller.motion_sequencer_manager)
         self.tabs_widget.addTab(self.source_tuning_tab, "Source Tuning")
         self.mod_matrix_tab = ModulationMatrixTab(self.app_context, self)
         self.tabs_widget.addTab(self.mod_matrix_tab, "Modulation Matrix")
@@ -249,6 +250,11 @@ class MainWindow(QMainWindow):
         # 2. Register System LFOs from the new scene's config.
         self.app_context.modulation_source_store.rebuild_system_lfo_sources(
             self.app_context.config.get('system_lfos', [])
+        )
+
+        # 2b. Register Motion Sequencers from the new scene's config.
+        self.app_context.modulation_source_store.rebuild_motion_sequencer_sources(
+            self.app_context.config.get('motion_sequencers', [])
         )
 
         # 3. Register Hotkeys from the new scene's config.

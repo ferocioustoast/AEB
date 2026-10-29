@@ -115,7 +115,7 @@ class StandardInspector(InspectorPanelBase):
             self.filter_freq_spinbox.setValue(conf.get('filter_cutoff_frequency', 1000.0))
             self.filter_q_spinbox.setValue(conf.get('filter_resonance_q', 0.707))
             self.filter_mix_spinbox.setValue(conf.get('filter_mix', 1.0))
-            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 5.0))
+            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 0.0))
             self.comb_feedforward_checkbox.setChecked(conf.get('comb_feedforward', False))
             
             vowel_val = conf.get('filter_formant_vowel', 0.0)

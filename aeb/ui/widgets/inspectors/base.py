@@ -31,7 +31,7 @@ POSITION_VALUE_MAPS = {
         'default_fallback': 1000.0,
         'tooltip': (
             "Maps motion position to an absolute carrier frequency. The "
-            "result is applied as an offset relative to this wave's own "
+            "result is applied as a ratio relative to this wave's own "
             "frequency, so matrix/LFO modulation still stacks on top."
         ),
     },
@@ -167,7 +167,15 @@ class InspectorPanelBase(QFrame):
 
     def _populate_position_maps(self, conf: dict):
         """Refreshes the position map widgets from a wave config."""
+        # Noise has no carrier pitch, so mapping its "frequency" is meaningless.
+        is_noise = str(conf.get('type', '')).endswith('_noise')
         for map_key, (checkbox, button) in self._position_map_widgets.items():
+            if map_key == 'spatial_frequency_map' and is_noise:
+                checkbox.setVisible(False)
+                button.setVisible(False)
+                continue
+            checkbox.setVisible(True)
+            button.setVisible(True)
             map_conf = conf.get(map_key)
             enabled = isinstance(map_conf, dict) and map_conf.get('enabled', False)
             checkbox.blockSignals(True)
@@ -181,7 +189,21 @@ class InspectorPanelBase(QFrame):
         if map_key == 'spatial_morph_map':
             value = 0.0
         else:
-            value = wave_conf.get(spec['default_key'], spec['default_fallback'])
+            # Samplers modulate their *playback pitch* via "frequency", but
+            # their no-op anchor is the pitch currently being played, not the
+            # generic carrier-frequency default. When the user has set an
+            # explicit target (sampler_frequency > 0) anchor there; otherwise
+            # the sampler auto-pitches from the sample's own detected pitch.
+            anchor_key = spec['default_key']
+            if (map_key == 'spatial_frequency_map'
+                    and wave_conf.get('type') == 'sampler'):
+                try:
+                    user_freq = float(wave_conf.get('sampler_frequency', 0.0))
+                except (TypeError, ValueError):
+                    user_freq = 0.0
+                anchor_key = ('sampler_frequency' if user_freq > 0.0
+                              else 'sampler_original_pitch')
+            value = wave_conf.get(anchor_key, spec['default_fallback'])
             try:
                 value = float(value)
             except (TypeError, ValueError):

@@ -86,7 +86,12 @@ def apply_modulations_to_parameters(
         if not rule.get('enabled', False):
             continue
 
-        if not rule.get('target', '').startswith(target_prefix):
+        rule_target = rule.get('target', '')
+        # Match the exact target or a dotted child of the prefix. A bare
+        # startswith would let "Motion Sequencer.A" also capture rules for
+        # "Motion Sequencer.AB", and "left.1" capture "left.10".
+        if rule_target != target_prefix and \
+                not rule_target.startswith(target_prefix + '.'):
             continue
 
         try:

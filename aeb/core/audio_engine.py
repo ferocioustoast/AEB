@@ -82,6 +82,9 @@ class AudioGenerator:
         max_comb_delay = int(sample_rate / 20.0) + 2
         self.comb_buffer = np.zeros(max_comb_delay, dtype=np.float64)
         self.comb_write_idx = 0
+        self.last_used_comb_delay: Optional[float] = None
+        self.last_used_comb_coeff: Optional[float] = None
+        self.last_used_comb_feedforward: Optional[bool] = None
         
         # Formant Filter State (List of 3 zi arrays)
         self.formant_filter_zi: List[Optional[np.ndarray]] = [None, None, None]
@@ -124,6 +127,7 @@ class AudioGenerator:
             new_config_dict: The new configuration dictionary to apply.
         """
         old_type = self.config.get('type')
+        old_filter_type = self.config.get('filter_type')
         self.config = copy.deepcopy(new_config_dict)
         new_type = self.config.get('type')
 
@@ -136,7 +140,14 @@ class AudioGenerator:
         self.last_used_cutoff = None
         self.last_used_q = None
         self.last_used_vowel = None
-        self._reset_comb_state()
+        # Only clear the comb delay line when the filter type actually changes
+        # or when it is no longer a comb; otherwise an unrelated edit (e.g.
+        # filter_mix) would truncate the ringing tail and click.
+        if old_filter_type != self.config.get('filter_type'):
+            self._reset_comb_state()
+            self.last_used_comb_delay = None
+            self.last_used_comb_coeff = None
+            self.last_used_comb_feedforward = None
 
     def generate_samples(self, eff_params: dict, gate_is_on: bool,
                          num_samples: int) -> np.ndarray:
@@ -193,7 +204,7 @@ class AudioGenerator:
             'filter_resonance_q': float(cfg.get('filter_resonance_q', 0.707)),
             'filter_formant_vowel': float(cfg.get('filter_formant_vowel', 0.0)),
             'filter_mix': float(cfg.get('filter_mix', 1.0)),
-            'filter_delay_ms': float(cfg.get('filter_delay_ms', 5.0)),
+            'filter_delay_ms': float(cfg.get('filter_delay_ms', 0.0)),
             'lfo_enabled': cfg.get('lfo_enabled', False),
             'filter_enabled': cfg.get('filter_enabled', False),
             'harmonics': list(cfg.get('harmonics', [1.0] + [0.0] * 15)),
@@ -284,49 +295,92 @@ class AudioGenerator:
         self.comb_write_idx = 0
 
     def _apply_comb_filter(self, block_view: np.ndarray, f_cutoff_param,
-                           f_q: float, mix: float):
-        """Applies a delay-line comb filter (feedback or feed-forward)."""
+                           f_q: float, mix: float, eff_params: dict):
+        """Applies a delay-line comb filter (feedback or feed-forward).
+
+        The delay length is ``filter_delay_ms`` when set (> 0), otherwise it is
+        derived from the cutoff. A per-sample fractional delay with linear
+        interpolation is used so a swept cutoff produces a smooth flanger
+        rather than a stepped, aliased read pointer.
+        """
         buf = self.comb_buffer
         buf_len = len(buf)
+        n = len(block_view)
 
-        # Delay length: cutoff derives the delay by default; filter_delay_ms
-        # overrides it when greater than zero.
-        delay_ms = float(self.config.get('filter_delay_ms', 0.0))
+        # Delay override: effective (matrix-modulated) value wins; fall back to
+        # the static config, then to cutoff-derived.
+        delay_ms = float(eff_params.get(
+            'filter_delay_ms', self.config.get('filter_delay_ms', 0.0)))
+        if not np.isfinite(delay_ms):
+            delay_ms = 0.0
+
+        # Cutoff mapped to a per-sample delay (in samples, fractional).
+        cutoff_arr = f_cutoff_param
+        if not isinstance(cutoff_arr, np.ndarray):
+            cutoff_arr = np.full(n, float(cutoff_arr), dtype=np.float64)
+        elif len(cutoff_arr) != n:
+            # Resample the (shorter) LFO segment to the block length so the
+            # read pointer is continuous across blocks.
+            src_x = np.linspace(0.0, 1.0, len(cutoff_arr))
+            dst_x = np.linspace(0.0, 1.0, n)
+            cutoff_arr = np.interp(dst_x, src_x, cutoff_arr)
+        cutoff_arr = np.nan_to_num(cutoff_arr, nan=1000.0, posinf=20000.0,
+                                   neginf=20.0)
+        cutoff_arr = np.clip(cutoff_arr, 20.0, 20000.0)
+
         if delay_ms > 0.0:
-            delay_samples = int(round(self.sample_rate * (delay_ms / 1000.0)))
+            delay_samples = np.full(n, self.sample_rate * (delay_ms / 1000.0))
         else:
-            avg_cutoff = np.mean(f_cutoff_param) if isinstance(
-                f_cutoff_param, np.ndarray) else f_cutoff_param
-            avg_cutoff = float(np.clip(avg_cutoff, 20.0, 20000.0))
-            delay_samples = int(round(self.sample_rate / avg_cutoff))
-        delay_samples = int(np.clip(delay_samples, 1, buf_len - 1))
+            delay_samples = self.sample_rate / cutoff_arr
+        delay_samples = np.clip(delay_samples, 1.0, buf_len - 2.0)
 
         # Q mapped to the comb coefficient, hard-clamped for stability.
         coeff = float(np.clip(0.5 + (f_q - 0.1) / (30.0 - 0.1) * (0.95 - 0.5),
                               0.0, 0.95))
         feedforward = bool(self.config.get('comb_feedforward', False))
 
-        write_idx = self.comb_write_idx
-        out = np.empty_like(block_view, dtype=np.float64)
+        # Only clear the delay line when its *structure* changes, not when the
+        # coefficient is swept: the buffer contents are independent of the
+        # feedback amount, and clearing on every modulated-Q block would destroy
+        # the effect and click. Switching feedback<->feed-forward changes what
+        # is written into the buffer (y vs x), so that does need a clear.
+        if (self.last_used_comb_feedforward is not None and
+                feedforward != self.last_used_comb_feedforward):
+            self._reset_comb_state()
+            buf = self.comb_buffer
+        self.last_used_comb_coeff = coeff
+        self.last_used_comb_feedforward = feedforward
 
-        for n in range(len(block_view)):
-            x = block_view[n]
-            read_idx = write_idx - delay_samples
-            if read_idx < 0:
-                read_idx += buf_len
-            delayed = buf[read_idx]
+        write_idx = self.comb_write_idx
+        out = np.empty(n, dtype=np.float64)
+
+        for i in range(n):
+            x = block_view[i]
+            delay = delay_samples[i]
+            int_delay = int(delay)
+            frac = delay - int_delay
+
+            read_a = write_idx - int_delay
+            if read_a < 0:
+                read_a += buf_len
+            read_b = read_a - 1
+            if read_b < 0:
+                read_b += buf_len
+            # Linear interpolation between the two neighbouring taps.
+            delayed = buf[read_a] * (1.0 - frac) + buf[read_b] * frac
+
+            y = x + coeff * delayed
             if feedforward:
-                y = x + coeff * delayed
                 buf[write_idx] = x
             else:
-                y = x + coeff * delayed
                 buf[write_idx] = y
-            out[n] = y
+            out[i] = y
             write_idx += 1
             if write_idx >= buf_len:
                 write_idx = 0
 
         self.comb_write_idx = write_idx
+        self.last_used_comb_delay = float(np.mean(delay_samples))
 
         if not np.all(np.isfinite(out)):
             self._reset_comb_state()
@@ -349,7 +403,8 @@ class AudioGenerator:
         mix = float(np.clip(eff_params.get('filter_mix', 1.0), 0.0, 1.0))
 
         if f_type == 'comb':
-            self._apply_comb_filter(block_view, f_cutoff_param, f_q, mix)
+            self._apply_comb_filter(block_view, f_cutoff_param, f_q, mix,
+                                    eff_params)
             return
         
         avg_cutoff = np.mean(f_cutoff_param) if isinstance(f_cutoff_param, np.ndarray) else f_cutoff_param
@@ -362,7 +417,7 @@ class AudioGenerator:
                        (f_type == 'formant' and (self.last_used_vowel is None or abs(f_vowel - self.last_used_vowel) > 0.01)))
 
         if recalculate:
-            self._recalculate_filter_coeffs(avg_cutoff, f_q, f_vowel)
+            self._recalculate_filter_coeffs(avg_cutoff, f_q, f_vowel, enabled=True)
             self.last_used_cutoff = avg_cutoff
             self.last_used_q = f_q
             self.last_used_vowel = f_vowel
@@ -405,11 +460,20 @@ class AudioGenerator:
 
     def _recalculate_filter_coeffs(self, f_cutoff: Optional[float] = None,
                                    f_q: Optional[float] = None,
-                                   f_vowel: Optional[float] = None):
+                                   f_vowel: Optional[float] = None,
+                                   enabled: Optional[bool] = None):
         """
         Recalculates the SOS filter coefficients based on current config.
+
+        Args:
+            enabled: Whether the filter is active. Defaults to the static
+                ``filter_enabled`` config flag, but callers on the audio path
+                (``_apply_filter``) pass the effective, possibly modulated
+                value so a dynamically-enabled filter still gets coefficients.
         """
-        if not self.config.get('filter_enabled'):
+        if enabled is None:
+            enabled = self.config.get('filter_enabled', False)
+        if not enabled:
             self.sos_coeffs = None
             self.filter_zi = None
             self.formant_filter_zi = [None, None, None]
@@ -418,12 +482,12 @@ class AudioGenerator:
 
         f_type = self.config.get('filter_type', 'lowpass')
 
-        # Comb mode does not use SOS coefficients; keep its delay line reset.
+        # Comb mode does not use SOS coefficients. Its delay-line state is
+        # cleared only when the filter type changes (handled in update_config).
         if f_type == 'comb':
             self.sos_coeffs = None
             self.filter_zi = None
             self.formant_filter_zi = [None, None, None]
-            self._reset_comb_state()
             return
 
         if f_cutoff is None:

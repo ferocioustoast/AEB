@@ -45,14 +45,30 @@ class SamplerGenerator(AudioGeneratorBase):
             new_config_dict: The new configuration dictionary to apply.
         """
         old_filepath = self.config.get('sampler_filepath')
+        old_pitch = self.config.get('sampler_original_pitch')
         super().update_config(new_config_dict)
         new_filepath = self.config.get('sampler_filepath')
+        new_pitch = self.config.get('sampler_original_pitch')
+
+        # Keep the runtime pitch in sync with config. The detected pitch is
+        # written back to ``sampler_original_pitch`` after analysis (independ-
+        # ently of the filepath), so a filepath-only refresh would leave this
+        # stale and corrupt every pitch ratio (base frequency, frequency maps).
+        try:
+            new_pitch = float(new_pitch)
+        except (TypeError, ValueError):
+            new_pitch = 0.0
+        if new_pitch > 0.0 and new_pitch != old_pitch:
+            self.original_sample_pitch = new_pitch
 
         if new_filepath != old_filepath:
             self.playhead = 0.0
-            self.original_sample_pitch = self.config.get(
-                'sampler_original_pitch', 0.0
-            )
+            if new_pitch > 0.0:
+                self.original_sample_pitch = new_pitch
+            else:
+                self.original_sample_pitch = self.config.get(
+                    'sampler_original_pitch', 0.0
+                )
             self._resolved_filepath = self._resolve_filepath()
             self._last_known_filepath = None
 

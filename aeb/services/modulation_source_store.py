@@ -105,6 +105,26 @@ class ModulationSourceStore:
                     self._sources[f"System LFO: {name} (Bipolar)"] = 0.0
                     self._sources[f"System LFO: {name} (Unipolar)"] = 0.0
 
+    def rebuild_motion_sequencer_sources(self, sequencer_definitions: list):
+        """
+        Clears and rebuilds all Motion Sequencer sources from the provided
+        definitions in a thread-safe, atomic operation.
+
+        Args:
+            sequencer_definitions: A list of Motion Sequencer definition
+                dictionaries.
+        """
+        with self._lock:
+            for key in list(self._sources.keys()):
+                if key.startswith("Motion Sequencer:"):
+                    del self._sources[key]
+
+            for seq in sequencer_definitions:
+                name = seq.get('name')
+                if name:
+                    self._sources[f"Motion Sequencer: {name} (Bipolar)"] = 0.0
+                    self._sources[f"Motion Sequencer: {name} (Unipolar)"] = 0.0
+
     def initialize_audio_input_sources(self, channel_definitions: list):
         """
         Clears and rebuilds all audio input sources from the provided

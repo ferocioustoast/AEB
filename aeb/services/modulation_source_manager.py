@@ -9,7 +9,7 @@ import random
 import threading
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 
@@ -94,6 +94,15 @@ class ModulationSourceManager:
         self._cadence_trend_is_up: bool = True
         self._cadence_last_extreme: float = 0.0
         self._current_sweep_hz: float = 0.0
+
+        # Shared Turnaround Event (published once per engine tick for Motion
+        # Sequencers and any other turnaround-clocked sources).
+        self._turnaround_event: bool = False
+        self._turnaround_count: int = 0
+
+        # Motion Sequencer State
+        self._motion_sequencer_states: dict = {}
+        self._warned_sequencer_names: set = set()
 
         # Rhythmic Trance Engine State
         self._trance_sweep_history = collections.deque(maxlen=4)
@@ -275,6 +284,9 @@ class ModulationSourceManager:
         self.loop_state = LoopState(last_update_time=current_time)
         self.was_randomizing_speed = False
         self._system_lfo_states.clear()
+        self._motion_sequencer_states.clear()
+        self._warned_sequencer_names.clear()
+        self._turnaround_event = False
         self._was_motion_active = False
         self.app_context.signals.log_message.emit(
             "Modulation source manager state has been reset."
@@ -292,17 +304,23 @@ class ModulationSourceManager:
         self.motion_jolt_history = collections.deque(
             list(self.motion_jolt_history), maxlen=new_maxlen)
 
-    def update_generative_sources(self, delta_time: float, effective_lfos: List[dict]):
+    def update_generative_sources(self, delta_time: float,
+                                  effective_lfos: List[dict],
+                                  effective_sequencers: Optional[List[dict]] = None):
         """Updates time-based, random, drift, and motion-derived sources."""
         if self._reset_requested.is_set():
             self._reset_requested.clear()
             self._perform_reset()
         current_time = time.perf_counter()
+        self._turnaround_event = False
         self._update_motion_derived_sources(current_time, delta_time)
         self._update_time_source(delta_time)
         self._update_random_source(current_time)
         self._update_drift_source(delta_time)
         self._update_system_lfos(delta_time, effective_lfos)
+        if effective_sequencers is None:
+            effective_sequencers = self.config.live_params.get('motion_sequencers', []) or []
+        self._update_motion_sequencers(delta_time, effective_sequencers)
         self._update_transient_impulse(delta_time)
         self.last_update_time = current_time
 
@@ -582,6 +600,8 @@ class ModulationSourceManager:
             if duration > 0.001: # Filter out near-instant updates
                 self._cadence_sweep_history.append(duration)
             self._cadence_last_turnaround_time = current_time
+            self._turnaround_event = True
+            self._turnaround_count += 1
             
             
         if len(self._cadence_sweep_history) > 0:
@@ -1288,3 +1308,188 @@ class ModulationSourceManager:
             unipolar_val = (bipolar_val + 1.0) / 2.0
             store.set_source(f"System LFO: {name} (Bipolar)", bipolar_val)
             store.set_source(f"System LFO: {name} (Unipolar)", unipolar_val)
+
+    def _update_motion_sequencers(self, delta_time: float,
+                                  sequencers: Optional[List[dict]] = None):
+        """Calculates Motion Sequencer sources, clocked by stroke turnarounds.
+
+        Each sequencer is advanced one step on every turnaround event detected
+        by the shared cadence tracker, unless its ``inactive_behavior`` allows
+        it to free-run on time while motion is idle.
+
+        ``sequencers`` carries the effective (post-modulation) definitions; when
+        omitted, the raw ``live_params`` list is used.
+        """
+        store = self.app_context.modulation_source_store
+        if sequencers is None:
+            sequencers = self.config.live_params.get('motion_sequencers', []) or []
+
+        current_time = time.perf_counter()
+        time_since_turnaround = current_time - self._cadence_last_turnaround_time
+        motion_active = (
+            self.config.motion_sources_are_in_use and time_since_turnaround <= 1.5
+        )
+
+        # Prune states for removed sequencers.
+        active_names = {s.get('name') for s in sequencers if s.get('name')}
+        for name in list(self._motion_sequencer_states.keys()):
+            if name not in active_names:
+                del self._motion_sequencer_states[name]
+
+        for seq in sequencers:
+            name = seq.get('name')
+            if not name:
+                continue
+
+            mode = seq.get('mode', 'wrap')
+            clock_source = seq.get('clock_source', 'turnaround')
+            inactive_behavior = seq.get('inactive_behavior', 'hold')
+            try:
+                period_strokes = max(float(seq.get('period_strokes', 1.0)), 0.01)
+                phase_offset = float(seq.get('phase_offset', 0.0))
+                depth = float(np.clip(seq.get('depth', 1.0), 0.0, 1.0))
+                clock_period_s = max(float(seq.get('clock_period_s', 1.0)), 0.01)
+            except (TypeError, ValueError):
+                # A malformed scene value must not abort the whole modulation
+                # cycle; skip this sequencer and neutralise its sources.
+                if name not in self._warned_sequencer_names:
+                    self.app_context.signals.log_message.emit(
+                        f"WARNING: Motion Sequencer '{name}' has an invalid "
+                        "numeric parameter and was skipped.")
+                    self._warned_sequencer_names.add(name)
+                store.set_source(f"Motion Sequencer: {name} (Bipolar)", 0.0)
+                store.set_source(f"Motion Sequencer: {name} (Unipolar)", 0.5)
+                continue
+
+            if name not in self._motion_sequencer_states:
+                self._motion_sequencer_states[name] = {
+                    'phase': 0.0,
+                    'step_index': 0,
+                    'last_value': 0.0,
+                    'dir': 1,
+                }
+            state = self._motion_sequencer_states[name]
+
+            # Determine the clocking mode for this tick.
+            # A turnaround *event* is definitive proof that motion is present,
+            # so motion-driven clocks honor it whenever motion sources are in
+            # use — even between turns of a slow stroke whose period exceeds the
+            # 1.5 s activity window (which would otherwise read as idle and drop
+            # the event, so the sequencer would never advance).
+            motion_in_use = self.config.motion_sources_are_in_use
+            idle = not motion_active
+            clock_is_motion_driven = clock_source in ('turnaround', 'either')
+            turnaround_now = (
+                clock_is_motion_driven and self._turnaround_event
+                and motion_in_use)
+            if clock_source == 'time':
+                allow_time_clock = True
+            elif clock_source == 'either':
+                # Turnaround-paced while moving, time-paced while idle.
+                allow_time_clock = idle
+            else:  # 'turnaround'
+                allow_time_clock = False
+
+            # Inactivity handling: only when there is no clock event this tick.
+            # 'hold'/'freeze' suppress the idle time clock for motion-driven
+            # clocks; a pure 'time' clock legitimately free-runs regardless.
+            if idle and clock_is_motion_driven and not turnaround_now:
+                if inactive_behavior == 'hold':
+                    allow_time_clock = False
+                elif inactive_behavior == 'freeze':
+                    allow_time_clock = False
+                    store.set_source(f"Motion Sequencer: {name} (Bipolar)", 0.0)
+                    store.set_source(f"Motion Sequencer: {name} (Unipolar)", 0.5)
+                    continue
+                elif inactive_behavior == 'free_run':
+                    allow_time_clock = True
+
+            stepped = False
+            time_clock_now = allow_time_clock
+
+            if mode == 'step':
+                step_values = seq.get('step_values', [])
+                if not isinstance(step_values, list) or not step_values:
+                    step_values = [0.0]
+                n = len(step_values)
+                if turnaround_now:
+                    stepped = True
+                    self._advance_step(state, seq.get('step_mode', 'forward'), n)
+                elif time_clock_now:
+                    # Advance on the time clock, carrying the remainder so the
+                    # step period does not drift by up to one tick each step.
+                    state['_time_accum'] = (
+                        state.get('_time_accum', 0.0) + delta_time)
+                    if state['_time_accum'] >= clock_period_s:
+                        state['_time_accum'] -= clock_period_s
+                        stepped = True
+                        self._advance_step(state, seq.get('step_mode', 'forward'), n)
+
+                # phase_offset shifts the starting step into the sequence so
+                # the spinbox is meaningful in step mode too.
+                step_offset = int(round(phase_offset * n)) % n
+                try:
+                    base_value = float(step_values[
+                        (state['step_index'] + step_offset) % n])
+                except (ValueError, TypeError, IndexError):
+                    base_value = 0.0
+                value = base_value
+            else:
+                # 'wrap' mode: phase advances one half-cycle per stroke.
+                if turnaround_now:
+                    state['phase'] = (
+                        state['phase'] + (1.0 / (period_strokes * 2.0))
+                    ) % 1.0
+                elif time_clock_now:
+                    state['phase'] = (
+                        state['phase'] + (delta_time / clock_period_s)
+                    ) % 1.0
+
+                waveform = seq.get('waveform', 'sine')
+                phase = (state['phase'] + phase_offset) % 1.0
+                value = self._evaluate_sequencer_waveform(phase, waveform)
+
+            # Depth scales amplitude about each source's neutral point so it
+            # never introduces a DC offset: unipolar scales from 0, bipolar
+            # scales about its 0 center (a plain pre-remap multiply would bias
+            # the bipolar source negative and pin it at -1 at depth 0).
+            raw_value = value
+            state['last_value'] = raw_value
+            bipolar_val = float(np.clip(
+                ((raw_value * 2.0) - 1.0) * depth, -1.0, 1.0))
+            unipolar_val = float(np.clip(raw_value * depth, 0.0, 1.0))
+            store.set_source(f"Motion Sequencer: {name} (Bipolar)", bipolar_val)
+            store.set_source(f"Motion Sequencer: {name} (Unipolar)", unipolar_val)
+
+    def _advance_step(self, state: dict, step_mode: str, n: int):
+        """Advances a step-mode sequencer's index according to its mode."""
+        if n <= 0:
+            return
+        if step_mode == 'random':
+            state['step_index'] = random.randrange(n)
+        elif step_mode == 'reverse':
+            state['step_index'] = (state['step_index'] - 1) % n
+        elif step_mode == 'pingpong':
+            idx = state['step_index'] + state.get('dir', 1)
+            if idx >= n:
+                idx = max(n - 2, 0)
+                state['dir'] = -1
+            elif idx < 0:
+                idx = min(1, n - 1)
+                state['dir'] = 1
+            state['step_index'] = idx
+        else:  # 'forward'
+            state['step_index'] = (state['step_index'] + 1) % n
+
+    @staticmethod
+    def _evaluate_sequencer_waveform(phase: float, waveform_type: str) -> float:
+        """Generates a normalized (0.0-1.0) value for a wrap-mode sequencer."""
+        if waveform_type == 'triangle':
+            if phase < 0.5:
+                return phase * 2.0
+            return 2.0 - (phase * 2.0)
+        if waveform_type == 'sawtooth':
+            return phase
+        if waveform_type == 'square':
+            return 0.0 if phase < 0.5 else 1.0
+        return (math.sin(phase * 2.0 * math.pi) + 1.0) / 2.0

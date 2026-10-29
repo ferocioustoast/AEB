@@ -30,6 +30,7 @@ from aeb.services.internal_loop import (
 from aeb.services.modulation_engine import ModulationEngine
 from aeb.services.screen_flow import ScreenFlowService
 from aeb.services.system_lfo_manager import SystemLfoManager
+from aeb.services.motion_sequencer_manager import MotionSequencerManager
 from aeb.services.udp_server import UdpTCodeServer
 from aeb.services.wsdm_client import WsdmClientService
 from aeb.services.waveform_manager import WaveformManager
@@ -63,6 +64,7 @@ class MainController(QObject):
         self.hotkey_manager = HotkeyManager(self.app_context)
         self.waveform_manager = WaveformManager(self.app_context)
         self.lfo_manager = SystemLfoManager(self.app_context)
+        self.motion_sequencer_manager = MotionSequencerManager(self.app_context)
         self.mod_engine_thread: Optional[threading.Thread] = None
         self.mod_engine_queue = queue.Queue(maxsize=1)
         self._active_sample_loaders: Dict[str, tuple[QThread, SampleLoaderWorker]] = {}
@@ -236,7 +238,7 @@ class MainController(QObject):
                        'motion_feel_R2_enabled', 'motion_feel_VR0_enabled',
                        'motion_feel_VL1_enabled', 'motion_feel_VV0_enabled',
                        'motion_feel_VA0_enabled',
-                       'modulation_matrix', 'system_lfos']
+                       'modulation_matrix', 'system_lfos', 'motion_sequencers']
 
         if setting_key in GLOBAL_CONTEXT_KEYS:
             old_value = getattr(self.app_context, setting_key)
@@ -361,6 +363,9 @@ class MainController(QObject):
         self.app_context.modulation_source_store.rebuild_system_lfo_sources(
             self.app_context.config.get('system_lfos', [])
         )
+        self.app_context.modulation_source_store.rebuild_motion_sequencer_sources(
+            self.app_context.config.get('motion_sequencers', [])
+        )
         self.main_window.load_current_settings_to_gui()
         self.main_window.refresh_oscilloscope_plots()
         self._recalculate_motion_source_usage()
@@ -375,6 +380,7 @@ class MainController(QObject):
         """
         if self.main_window:
             self.main_window._repopulate_mod_matrix_table()
+        self._recalculate_motion_source_usage()
         self._queue_engine_config_update()
         self.save_config_timer.start()
 
@@ -614,6 +620,11 @@ class MainController(QObject):
         
         lfos = self.app_context.config.get('system_lfos', [])
         if any(lfo.get('sync_to_motion') for lfo in lfos):
+            is_in_use = True
+
+        sequencers = self.app_context.config.get('motion_sequencers', [])
+        if any(seq.get('clock_source', 'turnaround') in ('turnaround', 'either')
+               for seq in sequencers):
             is_in_use = True
             
         if not is_in_use:

@@ -362,7 +362,14 @@ class LiveSyncTab(QWidget):
             self.ai_inspector_group.setEnabled(False)
             return
         self.ai_inspector_group.setEnabled(True)
-        with self.main_window._block_signals(self.ai_inspector_group):
+        with self.main_window._block_signals(
+                self.ai_inspector_group,
+                self.ai_channel_name_edit,
+                self.ai_filter_type_combo,
+                self.ai_cutoff_spinbox,
+                self.ai_q_spinbox,
+                self.ai_gain_spinbox,
+        ):
             self.ai_channel_name_edit.setText(config.get('name', ''))
             self.ai_filter_type_combo.setCurrentText(config.get('filter_type', 'lowpass'))
             self.ai_cutoff_spinbox.setValue(float(config.get('cutoff', 150.0)))

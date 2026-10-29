@@ -143,7 +143,7 @@ class ConfigurationManager:
         # Define the canonical order for saving keys to the JSON file.
         preferred_order = [
             'preset_metadata', 'sound_waves', 'modulation_matrix', 'hotkeys',
-            'system_lfos'
+            'system_lfos', 'motion_sequencers'
         ]
         # Get all other keys and sort them alphabetically for consistency.
         remaining_keys = sorted(
@@ -395,6 +395,9 @@ class ConfigurationManager:
         if 'modulation_matrix' in partial_data:
             self._migrate_modulation_matrix(partial_data['modulation_matrix'])
             complete_scene['modulation_matrix'] = partial_data['modulation_matrix']
+        if 'motion_sequencers' in partial_data:
+            complete_scene['motion_sequencers'] = self._validate_motion_sequencers(
+                partial_data.get('motion_sequencers'))
         return complete_scene
 
     def _sanitize_for_yaml(self, data: Any) -> Any:
@@ -447,7 +450,77 @@ class ConfigurationManager:
         validated_waves = self._normalize_sound_waves(settings.get('sound_waves'))
         if validated_waves != settings.get('sound_waves'): config_changed = True
         settings['sound_waves'] = validated_waves
+        validated_sequencers = self._validate_motion_sequencers(
+            settings.get('motion_sequencers'))
+        if validated_sequencers != settings.get('motion_sequencers'):
+            config_changed = True
+        settings['motion_sequencers'] = validated_sequencers
         return settings, config_changed
+
+    _MOTION_SEQUENCER_MODES = {'wrap', 'step'}
+    _MOTION_SEQUENCER_STEP_MODES = {'forward', 'reverse', 'pingpong', 'random'}
+    _MOTION_SEQUENCER_CLOCK_SOURCES = {'turnaround', 'time', 'either'}
+    _MOTION_SEQUENCER_INACTIVE = {'hold', 'freeze', 'free_run'}
+    _MOTION_SEQUENCER_WAVEFORMS = {'sine', 'square', 'sawtooth', 'triangle'}
+
+    def _validate_motion_sequencers(self, sequencers) -> list:
+        """Validates and coerces the motion_sequencers list."""
+        if not isinstance(sequencers, list):
+            return []
+
+        validated = []
+        seen_names = set()
+        for i, seq in enumerate(sequencers):
+            if not isinstance(seq, dict):
+                continue
+
+            name = seq.get('name')
+            if not isinstance(name, str) or not name.strip():
+                name = f"Sequencer {i + 1}"
+            name = name.strip()
+            base_name = name
+            suffix = 2
+            while name in seen_names:
+                name = f"{base_name} {suffix}"
+                suffix += 1
+            seen_names.add(name)
+
+            def _enum(key, allowed, default):
+                val = seq.get(key, default)
+                return val if val in allowed else default
+
+            def _clamp(key, lo, hi, default):
+                try:
+                    return min(hi, max(lo, float(seq.get(key, default))))
+                except (ValueError, TypeError):
+                    return default
+
+            step_values = seq.get('step_values', [0.0, 1.0])
+            if not isinstance(step_values, list) or not step_values:
+                step_values = [0.0, 1.0]
+            coerced_steps = []
+            for v in step_values:
+                try:
+                    coerced_steps.append(min(1.0, max(0.0, float(v))))
+                except (ValueError, TypeError):
+                    coerced_steps.append(0.0)
+
+            validated.append({
+                'name': name,
+                'mode': _enum('mode', self._MOTION_SEQUENCER_MODES, 'wrap'),
+                'waveform': _enum('waveform', self._MOTION_SEQUENCER_WAVEFORMS, 'sine'),
+                'period_strokes': _clamp('period_strokes', 0.01, 64.0, 1.0),
+                'step_values': coerced_steps,
+                'step_mode': _enum('step_mode', self._MOTION_SEQUENCER_STEP_MODES, 'forward'),
+                'clock_source': _enum('clock_source', self._MOTION_SEQUENCER_CLOCK_SOURCES, 'turnaround'),
+                'clock_period_s': _clamp('clock_period_s', 0.01, 3600.0, 1.0),
+                'phase_offset': _clamp('phase_offset', 0.0, 1.0, 0.0),
+                'depth': _clamp('depth', 0.0, 1.0, 1.0),
+                'bipolar': bool(seq.get('bipolar', True)),
+                'inactive_behavior': _enum(
+                    'inactive_behavior', self._MOTION_SEQUENCER_INACTIVE, 'hold'),
+            })
+        return validated
 
     def _normalize_sound_waves(self, sound_waves_dict: dict) -> dict:
         """Ensures a sound_waves dict is fully validated and structured."""

@@ -16,11 +16,13 @@ import pyqtgraph as pg
 import numpy as np
 
 from aeb.ui.widgets.panels.system_lfos_panel import SystemLfosPanel
+from aeb.ui.widgets.panels.motion_sequencers_panel import MotionSequencersPanel
 from aeb.ui.widgets.dialogs import GenericCurveEditorDialog
 
 if TYPE_CHECKING:
     from aeb.app_context import AppContext
     from aeb.services.system_lfo_manager import SystemLfoManager
+    from aeb.services.motion_sequencer_manager import MotionSequencerManager
     from aeb.ui.main_window import MainWindow
 
 
@@ -28,7 +30,8 @@ class SourceTuningTab(QWidget):
     """A master/detail view for tuning advanced modulation sources."""
 
     def __init__(self, app_context: 'AppContext', main_window: 'MainWindow',
-                 lfo_manager: 'SystemLfoManager', parent=None):
+                 lfo_manager: 'SystemLfoManager',
+                 sequencer_manager: 'MotionSequencerManager' = None, parent=None):
         """
         Initializes the SourceTuningTab.
 
@@ -36,12 +39,14 @@ class SourceTuningTab(QWidget):
             app_context: The central application context.
             main_window: The main application window instance.
             lfo_manager: The manager service for system LFOs.
+            sequencer_manager: The manager service for motion sequencers.
             parent: The parent QWidget, if any.
         """
         super().__init__(parent)
         self.app_context = app_context
         self.main_window = main_window
         self.lfo_manager = lfo_manager
+        self.sequencer_manager = sequencer_manager
 
         main_layout = QHBoxLayout(self)
         splitter = QSplitter(self)
@@ -74,6 +79,8 @@ class SourceTuningTab(QWidget):
         panels = {
             "System LFOs": SystemLfosPanel(
                 self.app_context, self.main_window, self.lfo_manager),
+            "Motion Sequencers": MotionSequencersPanel(
+                self.app_context, self.main_window, self.sequencer_manager),
             "Signal Safety & Integrity": self._create_signal_fortress_group(),
             "Somatic State Engine": self._create_somatic_state_engine_group(),
             "Spatial Thermodynamics (Heatmap)": self._create_spatial_thermodynamics_group(),
@@ -105,6 +112,13 @@ class SourceTuningTab(QWidget):
             lfo_panel = self.panel_stack.widget(lfo_panel_index)
             if isinstance(lfo_panel, SystemLfosPanel):
                 lfo_panel.populate_from_settings()
+
+        for i in range(self.category_list.count()):
+            if self.category_list.item(i).text() == "Motion Sequencers":
+                seq_panel = self.panel_stack.widget(i)
+                if isinstance(seq_panel, MotionSequencersPanel):
+                    seq_panel.populate_from_settings()
+                break
 
         self.time_period_spinbox.setValue(cfg.get('internal_time_period_s'))
         self.random_rate_spinbox.setValue(cfg.get('internal_random_rate_hz'))

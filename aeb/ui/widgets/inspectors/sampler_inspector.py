@@ -91,7 +91,7 @@ class SamplerInspector(InspectorPanelBase):
                 
             mode = conf.get('sampler_loop_mode', 'Forward Loop')
             self.loop_mode_combo.setCurrentText(mode)
-            self.scrub_speed_spinbox.setValue(conf.get('sampler_scrub_speed_limit', 1000000.0))
+            self.scrub_speed_spinbox.setValue(conf.get('sampler_scrub_speed_limit', 80000.0))
             
             is_scrub = (mode == 'Scrub')
             self.freq_spinbox.setEnabled(not is_scrub)
@@ -133,7 +133,7 @@ class SamplerInspector(InspectorPanelBase):
             self.filter_q_spinbox.setValue(
                 conf.get('filter_resonance_q', 0.707))
             self.filter_mix_spinbox.setValue(conf.get('filter_mix', 1.0))
-            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 5.0))
+            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 0.0))
             self.comb_feedforward_checkbox.setChecked(
                 conf.get('comb_feedforward', False))
             
@@ -242,7 +242,7 @@ class SamplerInspector(InspectorPanelBase):
         self.loop_mode_combo.currentTextChanged.connect(self._on_loop_mode_changed)
 
         self.scrub_speed_spinbox = QDoubleSpinBox(
-            decimals=1, minimum=0.0, maximum=100000.0, singleStep=100.0)
+            decimals=1, minimum=0.0, maximum=1000000.0, singleStep=100.0)
         self.scrub_speed_spinbox.setToolTip(
             "Safety limit for Scrub speed in Hz.\n"
             "Prevents sudden tracker jumps from translating into painful audio transients.\n"

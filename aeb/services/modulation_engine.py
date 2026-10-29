@@ -76,6 +76,7 @@ class ModulationEngine:
         self._activation_levels: dict[int, float] = {}
         self._effective_matrix: list = []
         self._effective_lfo_params: list = []
+        self._effective_sequencer_params: list = []
         self._scene_trigger_states: dict[int, bool] = {}
         self._lock = threading.Lock()
         self._last_update_error_key = None
@@ -298,7 +299,9 @@ class ModulationEngine:
         }
 
         self._update_lfo_parameters(effective_matrix)
-        self.mod_source_manager.update_generative_sources(delta_time, self._effective_lfo_params)
+        self._update_sequencer_parameters(effective_matrix)
+        self.mod_source_manager.update_generative_sources(
+            delta_time, self._effective_lfo_params, self._effective_sequencer_params)
         self.mod_source_manager.update_base_loop_parameters()
         self.mod_source_manager.synthesize_loop_source(delta_time)
         self._update_positional_ambient_gain()
@@ -414,6 +417,38 @@ class ModulationEngine:
                 activation_levels, sources, mod_matrix_override=mod_matrix_to_execute
             )
             lfo_params.update(final_lfo_params)
+
+    def _update_sequencer_parameters(self, mod_matrix_to_execute: list):
+        """
+        Calculates the final effective parameters for all Motion Sequencers
+        for the current cycle by applying modulations.
+        """
+        self._effective_sequencer_params = copy.deepcopy(
+            self.config.live_params.get('motion_sequencers', [])
+        )
+        sources = self._get_unified_sources_snapshot()
+        activation_levels = {
+            idx: self.app_context.condition_evaluator.evaluate(rule, idx, 0, sources)
+            for idx, rule in enumerate(mod_matrix_to_execute)
+        }
+        seq_dict = {
+            seq.get('name'): seq
+            for seq in self._effective_sequencer_params if seq.get('name')
+        }
+
+        for name, seq_params in seq_dict.items():
+            target_prefix = f"Motion Sequencer.{name}"
+            base_seq_params = {
+                'period_strokes': seq_params.get('period_strokes', 1.0),
+                'clock_period_s': seq_params.get('clock_period_s', 1.0),
+                'phase_offset': seq_params.get('phase_offset', 0.0),
+                'depth': seq_params.get('depth', 1.0),
+            }
+            final_seq_params, _ = apply_modulations_to_parameters(
+                self.app_context, target_prefix, base_seq_params,
+                activation_levels, sources, mod_matrix_override=mod_matrix_to_execute
+            )
+            seq_params.update(final_seq_params)
 
     def _update_live_parameters(self, effective_matrix: list,
                                 activation_levels: dict,
@@ -606,7 +641,7 @@ class ModulationEngine:
             mod = 1.0 + lfo_signal * depth
             eff_params['amplitude'] = np.maximum(
                 0.0, eff_params['amplitude'] * mod)
-        elif target == 'filter_cutoff' and cfg.get('filter_enabled', False):
+        elif target == 'filter_cutoff' and eff_params.get('filter_enabled', False):
             mod = 1.0 + lfo_signal * depth
             eff_params['filter_cutoff_frequency'] = np.clip(
                 eff_params['filter_cutoff_frequency'] * mod, 20.0, 20000.0)
@@ -625,7 +660,12 @@ class ModulationEngine:
         with self.app_context.audio_callback_configs_lock, self.app_context.live_params_lock:
             final_params = {}
             live_params = self.app_context.live_params
-            num_samples_hint = int(live_params.get('audio_buffer_size', 64))
+            # audio_buffer_size is a GLOBAL setting (never in live_params), and
+            # the stream is opened with blocksize == this value, so it is the
+            # authoritative block length for per-sample LFO arrays.
+            num_samples_hint = int(
+                self.app_context.config.get('audio_buffer_size', 64)
+            )
 
             for ch_key, generators in self.app_context.source_channel_generators.items():
                 for i, gen_wrapper in enumerate(generators):
@@ -672,7 +712,9 @@ class ModulationEngine:
                     # --- Spatial Mapping LUT Lookup ---
                     if lut_key in self.app_context.spatial_mapping_luts:
                         luts = self.app_context.spatial_mapping_luts[lut_key]
-                        motion_val = self.app_context.last_processed_motor_value
+                        motion_val = float(np.nan_to_num(
+                            self.app_context.last_processed_motor_value,
+                            nan=0.0, posinf=1.0, neginf=0.0))
 
                         # === Spatial Phase Displacement ===
                         # Allows L and R lookups to diverge based on speed/settings
@@ -685,11 +727,11 @@ class ModulationEngine:
                         pos_R = np.clip(motion_val + (phase_offset * 0.5), 0.0, 1.0)
 
                         lut_len = LUT_RESOLUTION - 1
-                        index_L = int(pos_L * lut_len)
-                        index_R = int(pos_R * lut_len)
+                        index_L = int(np.clip(pos_L * lut_len, 0, lut_len))
+                        index_R = int(np.clip(pos_R * lut_len, 0, lut_len))
                         index_center = int(np.clip(motion_val, 0.0, 1.0) * lut_len)
 
-                        if 'lut_left' in luts:
+                        if 'lut_left' in luts and 'lut_right' in luts:
                             final_eff_params['spatial_gain_l'] = luts['lut_left'][index_L]
                             final_eff_params['spatial_gain_r'] = luts['lut_right'][index_R]
 

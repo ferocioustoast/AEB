@@ -100,9 +100,14 @@ class AdditiveGenerator(AudioGeneratorBase):
         # --- Synthesis ---
         phase_inc = 2 * np.pi * params['frequency'] / self.sample_rate
         t_samples = np.arange(num_samples)
-        
-        # Calculate fundamental phases first
-        fundamental_phases = self.phase + t_samples * phase_inc
+
+        # Calculate fundamental phases first. A per-sample (LFO-modulated)
+        # frequency must be integrated as a cumulative phase sum, not scaled,
+        # so the oscillator tracks the true swept frequency.
+        if isinstance(phase_inc, np.ndarray):
+            fundamental_phases = self.phase + np.cumsum(phase_inc)
+        else:
+            fundamental_phases = self.phase + t_samples * phase_inc
 
         # Phase Jitter Logic (Organic Friction)
         jitter = params.get('phase_jitter_amount', 0.0)
@@ -131,8 +136,10 @@ class AdditiveGenerator(AudioGeneratorBase):
         # Sum all harmonics into the block
         np.sum(harmonic_waves, axis=0, out=block)
         
-        final_phase_inc = phase_inc[-1] if isinstance(phase_inc, np.ndarray) \
-            else phase_inc
-        self.phase = (self.phase + num_samples * final_phase_inc) % (2 * np.pi)
+        if isinstance(phase_inc, np.ndarray):
+            phase_advance = float(np.sum(phase_inc))
+        else:
+            phase_advance = num_samples * phase_inc
+        self.phase = (self.phase + phase_advance) % (2 * np.pi)
 
         block *= params['amplitude'] * envelope

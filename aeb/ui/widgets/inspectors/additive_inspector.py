@@ -95,7 +95,10 @@ class AdditiveInspector(InspectorPanelBase):
             self.pan_spinbox.setEnabled(not is_spatial_enabled)
             self._populate_position_maps(conf)
 
-            harmonics = conf.get('harmonics', [1.0] + [0.0] * 15)
+            harmonics = list(conf.get('harmonics', [1.0] + [0.0] * 15))
+            harmonics = harmonics[:16]
+            while len(harmonics) < 16:
+                harmonics.append(0.0)
             for i, h_val in enumerate(harmonics):
                 h_freq = freq * (i + 1)
                 self.harmonic_labels[i].setText(f"H{i+1} ({h_freq:.0f} Hz):")
@@ -121,7 +124,7 @@ class AdditiveInspector(InspectorPanelBase):
             self.filter_freq_spinbox.setValue(conf.get('filter_cutoff_frequency', 1000.0))
             self.filter_q_spinbox.setValue(conf.get('filter_resonance_q', 0.707))
             self.filter_mix_spinbox.setValue(conf.get('filter_mix', 1.0))
-            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 5.0))
+            self.filter_delay_spinbox.setValue(conf.get('filter_delay_ms', 0.0))
             self.comb_feedforward_checkbox.setChecked(conf.get('comb_feedforward', False))
             
             vowel_val = conf.get('filter_formant_vowel', 0.0)

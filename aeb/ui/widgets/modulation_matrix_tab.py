@@ -26,6 +26,7 @@ META_TARGET_PATTERN = re.compile(r"modulation_matrix\.(\d+)\.(amount|enabled)")
 STATE_TARGET_PATTERN = re.compile(r"State\.([a-zA-Z0-9_]+)\.(set|add|subtract|toggle)")
 SCENE_TARGET_PATTERN = re.compile(r"Scene\.TransitionTo\.(\d+)")
 LFO_TARGET_PATTERN = re.compile(r"System LFO\.([^.]+)\.(frequency|phase_offset|randomness|sync_to_motion|sync_multiplier|sync_inertia)")
+SEQ_TARGET_PATTERN = re.compile(r"Motion Sequencer\.([^.]+)\.(period_strokes|clock_period_s|phase_offset|depth)")
 MOTION_FEEL_TARGET_PATTERN = re.compile(r"MotionFeel\.([A-Z0-9V]+)\.(.+)")
 
 
@@ -292,6 +293,8 @@ class ModulationMatrixTab(QWidget):
             new_items = ['pressure']
         elif category_name == 'System LFO':
             new_items = ['frequency', 'phase_offset', 'randomness', 'sync_to_motion', 'sync_multiplier', 'sync_inertia']
+        elif category_name == 'Motion Sequencer':
+            new_items = ['period_strokes', 'clock_period_s', 'phase_offset', 'depth']
         elif category_name == 'Modulation Matrix':
             new_items = ['amount', 'enabled']
         elif category_name == 'State':
@@ -320,7 +323,7 @@ class ModulationMatrixTab(QWidget):
                 'adhesion_velocity_threshold', 'adhesion_stick_duration', 
                 'adhesion_snap_magnitude', 'adhesion_attack_s', 'adhesion_decay_s',
                 'impulse_mass', 'impulse_spring', 'impulse_damping',
-                'impulse_gain_spinbox', 'input_inertia',
+                'impulse_input_gain', 'input_inertia',
                 'impact_threshold', 'impact_decay_s', 'impact_zone_size',
                 'trance_memory_sweeps', 'trance_tolerance_pct',
                 'trance_immersion_rate', 'trance_shatter_rate', 'trance_timeout_factor'
@@ -373,7 +376,7 @@ class ModulationMatrixTab(QWidget):
         
         category_combo.addItems([
             'Left', 'Right', 'Ambient', 'Master', 'Ramping', 'Loop', 'Zonal',
-            'System LFO', 'MotionFeel', 'Source Tuning', 'Modulation Matrix',
+            'System LFO', 'Motion Sequencer', 'MotionFeel', 'Source Tuning', 'Modulation Matrix',
             'State', 'Scene', 'Internal Drivers'
         ])
         
@@ -408,6 +411,9 @@ class ModulationMatrixTab(QWidget):
         elif category_name == 'System LFO':
             lfo_names = [lfo.get('name', '') for lfo in self.app_context.config.get('system_lfos', [])]
             sub_target_combo.addItems(lfo_names)
+        elif category_name == 'Motion Sequencer':
+            seq_names = [seq.get('name', '') for seq in self.app_context.config.get('motion_sequencers', [])]
+            sub_target_combo.addItems(seq_names)
         elif category_name == 'MotionFeel':
             sub_target_combo.addItems(['L1', 'L2', 'R0', 'R1', 'R2', 'VR0', 'VL1', 'VV0', 'VA0'])
         elif category_name == 'Modulation Matrix':
@@ -449,8 +455,11 @@ class ModulationMatrixTab(QWidget):
         elif category == 'System LFO':
             sub = sub_stack.widget(0).currentText()
             if all([category, sub, param]): new_target_string = f"System LFO.{sub}.{param}"
+        elif category == 'Motion Sequencer':
+            sub = sub_stack.widget(0).currentText()
+            if all([category, sub, param]): new_target_string = f"Motion Sequencer.{sub}.{param}"
         elif category == 'Scene':
-            sub = sub_target_stack.widget(0).currentText()
+            sub = sub_stack.widget(0).currentText()
             if all([category, sub, param]):
                 try: new_target_string = f"Scene.{param}.{int(sub.split(' ')[-1])}"
                 except (ValueError, IndexError): return
@@ -499,6 +508,7 @@ class ModulationMatrixTab(QWidget):
         state_match = STATE_TARGET_PATTERN.match(target_str)
         scene_match = SCENE_TARGET_PATTERN.match(target_str)
         lfo_match = LFO_TARGET_PATTERN.match(target_str)
+        seq_match = SEQ_TARGET_PATTERN.match(target_str)
         motion_feel_match = MOTION_FEEL_TARGET_PATTERN.match(target_str)
 
         if meta_match:
@@ -509,6 +519,8 @@ class ModulationMatrixTab(QWidget):
             cat, param, sub = 'Scene', 'TransitionTo', f"Playlist Index {int(scene_match.group(1))}"
         elif lfo_match:
             cat, sub, param = 'System LFO', lfo_match.group(1), lfo_match.group(2)
+        elif seq_match:
+            cat, sub, param = 'Motion Sequencer', seq_match.group(1), seq_match.group(2)
         elif motion_feel_match:
             cat, sub, param = 'MotionFeel', motion_feel_match.group(1), motion_feel_match.group(2)
         elif target_str.startswith("Internal:"):
