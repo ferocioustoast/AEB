@@ -26,7 +26,7 @@ META_TARGET_PATTERN = re.compile(r"modulation_matrix\.(\d+)\.(amount|enabled)")
 STATE_TARGET_PATTERN = re.compile(r"State\.([a-zA-Z0-9_]+)\.(set|add|subtract|toggle)")
 SCENE_TARGET_PATTERN = re.compile(r"Scene\.TransitionTo\.(\d+)")
 LFO_TARGET_PATTERN = re.compile(r"System LFO\.([^.]+)\.(frequency|phase_offset|randomness|sync_to_motion|sync_multiplier|sync_inertia)")
-SEQ_TARGET_PATTERN = re.compile(r"Motion Sequencer\.([^.]+)\.(period_strokes|clock_period_s|phase_offset|depth)")
+SEQ_TARGET_PATTERN = re.compile(r"Motion Sequencer\.([^.]+)\.(period_sweeps|clock_period_s|phase_offset|depth)")
 MOTION_FEEL_TARGET_PATTERN = re.compile(r"MotionFeel\.([A-Z0-9V]+)\.(.+)")
 
 
@@ -294,7 +294,7 @@ class ModulationMatrixTab(QWidget):
         elif category_name == 'System LFO':
             new_items = ['frequency', 'phase_offset', 'randomness', 'sync_to_motion', 'sync_multiplier', 'sync_inertia']
         elif category_name == 'Motion Sequencer':
-            new_items = ['period_strokes', 'clock_period_s', 'phase_offset', 'depth']
+            new_items = ['period_sweeps', 'clock_period_s', 'phase_offset', 'depth']
         elif category_name == 'Modulation Matrix':
             new_items = ['amount', 'enabled']
         elif category_name == 'State':

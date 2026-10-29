@@ -509,7 +509,7 @@ class ConfigurationManager:
                 'name': name,
                 'mode': _enum('mode', self._MOTION_SEQUENCER_MODES, 'wrap'),
                 'waveform': _enum('waveform', self._MOTION_SEQUENCER_WAVEFORMS, 'sine'),
-                'period_strokes': _clamp('period_strokes', 0.01, 64.0, 1.0),
+                'period_sweeps': _clamp('period_sweeps', 0.01, 64.0, 1.0),
                 'step_values': coerced_steps,
                 'step_mode': _enum('step_mode', self._MOTION_SEQUENCER_STEP_MODES, 'forward'),
                 'clock_source': _enum('clock_source', self._MOTION_SEQUENCER_CLOCK_SOURCES, 'turnaround'),

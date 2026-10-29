@@ -1311,7 +1311,7 @@ class ModulationSourceManager:
 
     def _update_motion_sequencers(self, delta_time: float,
                                   sequencers: Optional[List[dict]] = None):
-        """Calculates Motion Sequencer sources, clocked by stroke turnarounds.
+        """Calculates Motion Sequencer sources, clocked by sweep turnarounds.
 
         Each sequencer is advanced one step on every turnaround event detected
         by the shared cadence tracker, unless its ``inactive_behavior`` allows
@@ -1345,7 +1345,7 @@ class ModulationSourceManager:
             clock_source = seq.get('clock_source', 'turnaround')
             inactive_behavior = seq.get('inactive_behavior', 'hold')
             try:
-                period_strokes = max(float(seq.get('period_strokes', 1.0)), 0.01)
+                period_sweeps = max(float(seq.get('period_sweeps', 1.0)), 0.01)
                 phase_offset = float(seq.get('phase_offset', 0.0))
                 depth = float(np.clip(seq.get('depth', 1.0), 0.0, 1.0))
                 clock_period_s = max(float(seq.get('clock_period_s', 1.0)), 0.01)
@@ -1373,7 +1373,7 @@ class ModulationSourceManager:
             # Determine the clocking mode for this tick.
             # A turnaround *event* is definitive proof that motion is present,
             # so motion-driven clocks honor it whenever motion sources are in
-            # use — even between turns of a slow stroke whose period exceeds the
+            # use — even between turns of a slow sweep whose period exceeds the
             # 1.5 s activity window (which would otherwise read as idle and drop
             # the event, so the sequencer would never advance).
             motion_in_use = self.config.motion_sources_are_in_use
@@ -1435,10 +1435,10 @@ class ModulationSourceManager:
                     base_value = 0.0
                 value = base_value
             else:
-                # 'wrap' mode: phase advances one half-cycle per stroke.
+                # 'wrap' mode: phase advances one half-cycle per sweep.
                 if turnaround_now:
                     state['phase'] = (
-                        state['phase'] + (1.0 / (period_strokes * 2.0))
+                        state['phase'] + (1.0 / (period_sweeps * 2.0))
                     ) % 1.0
                 elif time_clock_now:
                     state['phase'] = (

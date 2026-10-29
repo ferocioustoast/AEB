@@ -439,7 +439,7 @@ class ModulationEngine:
         for name, seq_params in seq_dict.items():
             target_prefix = f"Motion Sequencer.{name}"
             base_seq_params = {
-                'period_strokes': seq_params.get('period_strokes', 1.0),
+                'period_sweeps': seq_params.get('period_sweeps', 1.0),
                 'clock_period_s': seq_params.get('clock_period_s', 1.0),
                 'phase_offset': seq_params.get('phase_offset', 0.0),
                 'depth': seq_params.get('depth', 1.0),
